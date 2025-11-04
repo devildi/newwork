@@ -12,11 +12,13 @@ import Story from './pages/Story.tsx'
 import Photos from './pages/Photos.tsx'
 import WaterfallData from './pages/WaterfallData.tsx'
 import AllTrips from './pages/AllTrips.tsx'
+import MyTrips from './pages/MyTrips.tsx'
+import TripShow from './pages/TripShow.tsx'
 import EditTrips from './pages/EditTrips.tsx'
 import Preview from './pages/Preview.tsx'
 import ProtectedLayout from './layouts/ProtectedLayout.tsx'
 import { store } from './app/store.ts'
-import { preloadGaodeMap } from './components/GaodeMap.tsx'
+import { preloadGaodeMap } from './utils/amapLoader.ts'
 
 preloadGaodeMap('fbe59813637de60223e3d22805a2486c')
 
@@ -33,6 +35,8 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/photosInput" element={<PhotosInput />} />
             <Route path="/waterfall" element={<WaterfallData />} />
             <Route path="/alltrips" element={<AllTrips />} />
+            <Route path="/list" element={<MyTrips />} />
+            <Route path="/show" element={<TripShow />} />
             <Route path="/edit" element={<EditTrips />} />
             <Route path="/preview" element={<Preview />} />
             <Route path="/story" element={<Story />} />

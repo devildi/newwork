@@ -65,10 +65,9 @@ const WaterfallData = () => {
       setErrorMessage(null)
 
       try {
-        const response = await fetch(
-          `http://localhost:4000/api/trip/getStoryByPage?page=${currentPage}`,
-          { signal: controller.signal },
-        )
+        const response = await fetch(`/api/trip/getStoryByPage?page=${currentPage}`, {
+          signal: controller.signal,
+        })
 
         if (!response.ok) {
           throw new Error(`请求失败：${response.status}`)
@@ -156,7 +155,7 @@ const WaterfallData = () => {
       setDeletingStoryId(story._id)
       try {
         const response = await fetch(
-          'http://localhost:4000/api/trip/deleteStoryById',
+          '/api/trip/deleteStoryById',
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

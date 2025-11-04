@@ -137,7 +137,7 @@ const Story = () => {
     setIsSubmitting(true)
     try {
       const endpoint = isEditMode ? 'updateItem' : 'newItem'
-      const response = await fetch(`http://localhost:4000/api/trip/${endpoint}`, {
+      const response = await fetch(`/api/trip/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -199,10 +199,9 @@ const Story = () => {
     setIsFetchingDimensions(true)
     try {
       const params = new URLSearchParams({ url: imageUrl })
-      const response = await fetch(
-        `http://localhost:4000/api/trip/getImgWAH?${params.toString()}`,
-        { method: 'GET' },
-      )
+      const response = await fetch(`/api/trip/getImgWAH?${params.toString()}`, {
+        method: 'GET',
+      })
 
       if (!response.ok) {
         throw new Error(`请求失败：${response.status}`)

@@ -66,10 +66,9 @@ const Preview = () => {
       setErrorMessage(null)
 
       try {
-        const response = await fetch(
-          'http://localhost:4000/api/trip/previewImgs',
-          { signal: controller.signal },
-        )
+        const response = await fetch('/api/trip/previewImgs', {
+          signal: controller.signal,
+        })
 
         if (!response.ok) {
           throw new Error(`请求失败：${response.status}`)
@@ -186,7 +185,7 @@ const Preview = () => {
 
     setIsSavingImage(true)
     try {
-      const response = await fetch('http://localhost:4000/api/trip/updatePointImg', {
+      const response = await fetch('/api/trip/updatePointImg', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -277,7 +276,7 @@ const Preview = () => {
       setIsFetchingNewImage(true)
       const params = new URLSearchParams({ point })
       const response = await fetch(
-        `http://localhost:4000/api/trip/getBingImg?${params.toString()}`,
+        `/api/trip/getBingImg?${params.toString()}`,
         { method: 'GET' },
       )
 

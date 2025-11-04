@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, MutableRefObject } from 'react'
-import AMapLoader from '@amap/amap-jsapi-loader'
-
 import { createInfoWindowContent } from './mapInfoWindow.ts'
+import { ensureGaodeStylesheet, preloadGaodeMap } from '../utils/amapLoader.ts'
 
 declare global {
   interface Window {
     AMap?: any
-    _AMapSecurityConfig?: { securityJsCode?: string }
   }
 }
 
@@ -31,18 +29,6 @@ type GaodeMapProps = {
     onInfoWindowClick?: () => void
   }>
   mapInstanceRef?: MutableRefObject<any | null>
-}
-
-const MAP_STYLE_URL = 'https://webapi.amap.com/theme/v1.3/standard.css'
-let loaderPromise: Promise<any> | null = null
-
-const ensureMapStylesheet = () => {
-  if (document.querySelector<HTMLLinkElement>('link[data-amap-style="true"]')) return
-  const link = document.createElement('link')
-  link.rel = 'stylesheet'
-  link.href = MAP_STYLE_URL
-  link.setAttribute('data-amap-style', 'true')
-  document.head.appendChild(link)
 }
 
 const buildSharedMapRef = (map: any) => ({
@@ -77,14 +63,20 @@ const GaodeMap = ({
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isMapReady, setIsMapReady] = useState(false)
+  const onMapReadyRef = useRef(onMapReady)
+
+  useEffect(() => {
+    onMapReadyRef.current = onMapReady
+  }, [onMapReady])
 
   useEffect(() => {
     let isMounted = true
-    ensureMapStylesheet()
+    ensureGaodeStylesheet()
     setIsLoading(true)
 
-    preloadGaodeMap(apiKey, securityJsCode)
-      .then((AMap) => {
+    const loadMap = async () => {
+      try {
+        const AMap = await preloadGaodeMap(apiKey, securityJsCode)
         if (!isMounted || !containerRef.current) return
         if (!window.AMap) {
           window.AMap = AMap
@@ -96,23 +88,61 @@ const GaodeMap = ({
           animateEnable: false,
           showBuildingBlock: false,
         })
+        containerRef.current.style.border = 'none'
+        containerRef.current.style.height = '100%'
         if (mapInstanceRef) {
           mapInstanceRef.current = buildSharedMapRef(mapInstance.current)
         }
-        mapInstance.current.addControl(new AMap.Scale())
-        mapInstance.current.on('complete', () => {
+        const attachScaleControl = () => {
+          try {
+            if (typeof AMap.plugin === 'function') {
+              AMap.plugin('AMap.Scale', () => {
+                if (mapInstance.current) {
+                  mapInstance.current.addControl(new AMap.Scale())
+                }
+              })
+            } else if (AMap.Scale) {
+              mapInstance.current.addControl(new AMap.Scale())
+            }
+          } catch (controlError) {
+            console.warn('添加比例尺控件失败：', controlError)
+          }
+        }
+
+        attachScaleControl()
+
+        setIsLoading(false)
+        setIsMapReady(true)
+        onMapReadyRef.current?.(mapInstance.current)
+
+        let hasCompleted = false
+        const handleComplete = () => {
+          if (!isMounted) return
+          hasCompleted = true
           setIsLoading(false)
           setIsMapReady(true)
-        })
-        onMapReady?.(mapInstance.current)
-      })
-      .catch((loadError) => {
+          onMapReadyRef.current?.(mapInstance.current)
+          mapInstance.current?.off?.('complete', handleComplete)
+        }
+
+        mapInstance.current?.on?.('complete', handleComplete)
+
+        window.setTimeout(() => {
+          if (!isMounted || hasCompleted) return
+          setIsLoading(false)
+          setIsMapReady(true)
+          onMapReadyRef.current?.(mapInstance.current)
+        }, 1500)
+      } catch (loadError) {
         console.error('加载高德地图失败：', loadError)
         if (isMounted) {
           setError('地图加载失败，请稍后重试。')
           setIsLoading(false)
         }
-      })
+      }
+    }
+
+    void loadMap()
 
     return () => {
       isMounted = false
@@ -121,7 +151,9 @@ const GaodeMap = ({
         infoWindowsRef.current = []
         markersRef.current.forEach((marker) => marker.setMap(null))
         markersRef.current = []
-        mapInstance.current.destroy()
+        if (typeof mapInstance.current.destroy === 'function') {
+          mapInstance.current.destroy()
+        }
         mapInstance.current = null
         if (mapInstanceRef) {
           mapInstanceRef.current = null
@@ -129,7 +161,7 @@ const GaodeMap = ({
       }
       setIsMapReady(false)
     }
-  }, [apiKey, securityJsCode, onMapReady])
+  }, [apiKey, securityJsCode])
 
   useEffect(() => {
     if (!mapInstance.current) return
@@ -250,24 +282,3 @@ const GaodeMap = ({
 }
 
 export default GaodeMap
-
-export const preloadGaodeMap = (apiKey: string, securityJsCode?: string) => {
-  ensureMapStylesheet()
-
-  if (securityJsCode) {
-    window._AMapSecurityConfig = {
-      ...(window._AMapSecurityConfig || {}),
-      securityJsCode,
-    }
-  }
-
-  if (!loaderPromise) {
-    loaderPromise = AMapLoader.load({
-      key: apiKey,
-      version: '1.4.15',
-      plugins: ['AMap.Scale', 'AMap.PlaceSearch'],
-    })
-  }
-
-  return loaderPromise
-}

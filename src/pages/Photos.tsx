@@ -64,10 +64,9 @@ const Photos = () => {
       setErrorMessage(null)
 
       try {
-        const response = await fetch(
-          `http://localhost:4000/api/trip/getPhotos?page=${currentPage}`,
-          { signal: controller.signal },
-        )
+        const response = await fetch(`/api/trip/getPhotos?page=${currentPage}`, {
+          signal: controller.signal,
+        })
 
         if (!response.ok) {
           throw new Error(`请求失败：${response.status}`)
@@ -149,7 +148,7 @@ const Photos = () => {
     setIsDeletingPhoto(true)
 
     try {
-      const response = await fetch('http://localhost:4000/api/trip/deletePhoto', {
+      const response = await fetch('/api/trip/deletePhoto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: targetId }),

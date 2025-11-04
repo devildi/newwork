@@ -99,10 +99,9 @@ const AllTrips = () => {
       setErrorMessage(null)
 
       try {
-        const response = await fetch(
-          `http://localhost:4000/api/trip/getAllTripByPage?page=${currentPage}`,
-          { signal: controller.signal },
-        )
+        const response = await fetch(`/api/trip/getAllTripByPage?page=${currentPage}`, {
+          signal: controller.signal,
+        })
 
         if (!response.ok) {
           throw new Error(`请求失败：${response.status}`)

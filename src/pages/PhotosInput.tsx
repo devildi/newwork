@@ -92,10 +92,9 @@ const PhotosInput = () => {
     setIsFetchingDimensions(true)
     try {
       const params = new URLSearchParams({ url: imageUrl })
-      const response = await fetch(
-        `http://localhost:4000/api/trip/getImgWAH?${params.toString()}`,
-        { method: 'GET' },
-      )
+      const response = await fetch(`/api/trip/getImgWAH?${params.toString()}`, {
+        method: 'GET',
+      })
 
       if (!response.ok) {
         throw new Error(`请求失败：${response.status}`)
@@ -154,8 +153,8 @@ const PhotosInput = () => {
       setIsSubmitting(true)
       try {
         const endpoint = isEditing
-          ? 'http://localhost:4000/api/trip/updatePhoto'
-          : 'http://localhost:4000/api/trip/photoInput'
+          ? '/api/trip/updatePhoto'
+          : '/api/trip/photoInput'
         const requestBody =
           isEditing && editingId ? { ...payload, _id: editingId } : payload
         const response = await fetch(endpoint, {

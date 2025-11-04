@@ -1,6 +1,7 @@
 export const APP_TITLE = 'NextSticker'
 
 export const FEATURE_ITEMS = [
+  '我的行程',
   '照片录入',
   '所有照片',
   '瀑布流数据',
@@ -11,6 +12,7 @@ export const FEATURE_ITEMS = [
 ] as const
 
 export const HOME_NAVIGATION: Record<string, string> = {
+  我的行程: '/list',
   照片录入: '/photosInput',
   所有照片: '/photos',
   瀑布流数据: '/waterfall',
