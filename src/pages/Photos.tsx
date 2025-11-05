@@ -188,7 +188,7 @@ const Photos = () => {
         flexDirection: 'column',
       }}
     >
-      <AppBar position="static" color="primary" elevation={2}>
+      <AppBar position="fixed" color="primary" elevation={2}>
         <Toolbar
           sx={{
             display: 'flex',
@@ -214,6 +214,7 @@ const Photos = () => {
           <Box sx={{ width: 40, height: 40 }} aria-hidden />
         </Toolbar>
       </AppBar>
+      <Toolbar />
 
       <Box sx={{ px: { xs: 2, sm: 3, lg: 6 }, py: { xs: 3, md: 4 }, flexGrow: 1 }}>
         {isLoading ? (

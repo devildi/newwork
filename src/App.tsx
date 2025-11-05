@@ -24,7 +24,7 @@ function App() {
       <CssBaseline />
       <Box className="app">
         <Stack sx={{ minHeight: '100vh' }}>
-          <AppBar position="static" elevation={2}>
+          <AppBar position="fixed" elevation={2}>
             <Toolbar
               sx={{
                 display: 'flex',
@@ -64,6 +64,7 @@ function App() {
               </Box>
             </Toolbar>
           </AppBar>
+          <Toolbar />
 
           <Container
             maxWidth="md"

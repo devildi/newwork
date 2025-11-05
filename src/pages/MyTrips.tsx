@@ -171,7 +171,7 @@ const MyTrips = () => {
         backgroundColor: '#f4f6fb',
       }}
     >
-      <AppBar position="static" color="primary" elevation={2}>
+      <AppBar position="fixed" color="primary" elevation={2}>
         <Toolbar
           sx={{
             display: 'flex',
@@ -188,6 +188,7 @@ const MyTrips = () => {
           <Box sx={{ width: 48, height: 48 }} />
         </Toolbar>
       </AppBar>
+      <Toolbar />
       <Box
         sx={{
           flexGrow: 1,

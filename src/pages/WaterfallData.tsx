@@ -203,7 +203,7 @@ const WaterfallData = () => {
         backgroundColor: '#f4f6fb',
       }}
     >
-      <AppBar position="static" color="primary" elevation={2}>
+      <AppBar position="fixed" color="primary" elevation={2}>
         <Toolbar
           sx={{
             display: 'flex',
@@ -229,6 +229,7 @@ const WaterfallData = () => {
           <Box sx={{ width: 40, height: 40 }} aria-hidden />
         </Toolbar>
       </AppBar>
+      <Toolbar />
 
       <Box
         sx={{

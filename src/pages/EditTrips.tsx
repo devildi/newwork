@@ -30,8 +30,39 @@ import ExpandLess from '@mui/icons-material/ExpandLess'
 import ExpandMore from '@mui/icons-material/ExpandMore'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
+import SearchIcon from '@mui/icons-material/Search'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type MouseEvent,
+} from 'react'
+import Menu from '@mui/material/Menu'
+import useMediaQuery from '@mui/material/useMediaQuery'
+import { useTheme } from '@mui/material/styles'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCorners,
+  type DragEndEvent,
+  type DragStartEvent,
+  useDroppable,
+  type UniqueIdentifier,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 import GaodeMap from '../components/GaodeMap.tsx'
 import GoogleMap from '../components/GoogleMap.tsx'
@@ -101,6 +132,231 @@ type TripState = {
 
 const GAODE_MAP_API_KEY = 'fbe59813637de60223e3d22805a2486c'
 const GOOGLE_MAP_API_KEY = 'AIzaSyB5LS2bbGE_Iw1e7Dc3_al7glDliILip_c'
+
+const buildSortablePointId = (dayIndex: number, pointIndex: number): string =>
+  `day-${dayIndex}-point-${pointIndex}`
+
+const buildDayHeaderId = (dayIndex: number): string => `day-${dayIndex}-header`
+
+const parseSortablePointId = (
+  id: UniqueIdentifier,
+): { dayIndex: number; pointIndex: number } | null => {
+  if (typeof id !== 'string') return null
+  const match = /^day-(\d+)-point-(\d+)$/.exec(id)
+  if (!match) return null
+  return {
+    dayIndex: Number.parseInt(match[1], 10),
+    pointIndex: Number.parseInt(match[2], 10),
+  }
+}
+
+const parseDayHeaderId = (id: UniqueIdentifier): { dayIndex: number } | null => {
+  if (typeof id !== 'string') return null
+  const match = /^day-(\d+)-header$/.exec(id)
+  if (!match) return null
+  return { dayIndex: Number.parseInt(match[1], 10) }
+}
+
+type SortablePointItemProps = {
+  id: string
+  dayIndex: number
+  pointIndex: number
+  label: string
+  isSelected: boolean
+  disableSelection: boolean
+  isDraggingSource: boolean
+  onSelect: () => void
+  onRemove: () => void
+}
+
+const SortablePointItem = ({
+  id,
+  dayIndex,
+  pointIndex,
+  label,
+  isSelected,
+  disableSelection,
+  isDraggingSource,
+  onSelect,
+  onRemove,
+}: SortablePointItemProps) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 1 : undefined,
+    visibility: isDraggingSource ? 'hidden' : undefined,
+  } as const
+
+  return (
+    <ListItem ref={setNodeRef} disablePadding style={style}>
+      <ListItemButton
+        {...attributes}
+        {...listeners}
+        disableRipple
+        disableTouchRipple
+        sx={{
+          pl: 4,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          cursor: isDragging ? 'grabbing' : 'grab',
+          touchAction: 'none',
+          backgroundColor: isDragging
+            ? 'rgba(37, 99, 235, 0.12)'
+            : isSelected
+              ? 'rgba(37, 99, 235, 0.08)'
+              : 'transparent',
+          transition: 'background-color 0.2s ease, transform 0.2s ease',
+          '&:hover': {
+            backgroundColor: isDragging
+              ? 'rgba(37, 99, 235, 0.16)'
+              : 'rgba(148, 163, 184, 0.12)',
+          },
+          '&:active': {
+            backgroundColor: isDragging
+              ? 'rgba(37, 99, 235, 0.16)'
+              : 'rgba(148, 163, 184, 0.16)',
+          },
+          '&.Mui-focusVisible': {
+            backgroundColor: isDragging
+              ? 'rgba(37, 99, 235, 0.16)'
+              : isSelected
+                ? 'rgba(37, 99, 235, 0.12)'
+                : 'rgba(148, 163, 184, 0.12)',
+          },
+        }}
+        selected={isSelected}
+        onClick={(event) => {
+          if (disableSelection || isDragging) {
+            event.preventDefault()
+            return
+          }
+          onSelect()
+        }}
+      >
+        <ListItemText primary={label} sx={{ flexGrow: 1 }} />
+        <IconButton
+          edge="end"
+          size="small"
+          sx={{ ml: 1 }}
+          color="error"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation()
+            onRemove()
+          }}
+          aria-label={`删除第 ${dayIndex + 1} 天的第 ${pointIndex + 1} 个点位`}
+        >
+          <DeleteOutlineIcon fontSize="small" />
+        </IconButton>
+      </ListItemButton>
+    </ListItem>
+  )
+}
+
+type DaySectionProps = {
+  dayIndex: number
+  dayKey: number
+  dayPoints: TripDetailPoint[]
+  isOpen: boolean
+  activeDragId: UniqueIdentifier | null
+  selectedPoint: ActivePoint | null
+  toggleDay: () => void
+  onRemoveDay: () => void
+  onSelectPoint: (point: TripDetailPoint, dayIndex: number, pointIndex: number) => () => void
+  onRemovePoint: (dayIndex: number, pointIndex: number) => void
+  renderPointLabel: (point: TripDetailPoint, index: number) => string
+}
+
+const DaySection = ({
+  dayIndex,
+  dayKey,
+  dayPoints,
+  isOpen,
+  activeDragId,
+  selectedPoint,
+  toggleDay,
+  onRemoveDay,
+  onSelectPoint,
+  onRemovePoint,
+  renderPointLabel,
+}: DaySectionProps) => {
+  const headerId = buildDayHeaderId(dayIndex)
+  const { setNodeRef: setDayHeaderRef, isOver: isDayHeaderOver } = useDroppable({
+    id: headerId,
+    disabled: isOpen,
+  })
+
+  return (
+    <Box>
+      <ListItemButton
+        ref={setDayHeaderRef}
+        onClick={toggleDay}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          transition: 'background-color 0.2s ease',
+          backgroundColor: isDayHeaderOver ? 'rgba(37, 99, 235, 0.12)' : undefined,
+        }}
+      >
+        <ListItemText primary={`第 ${dayKey} 天`} sx={{ flexGrow: 1 }} />
+        <IconButton
+          edge="end"
+          size="small"
+          sx={{ ml: 1 }}
+          color="error"
+          onClick={(event) => {
+            event.stopPropagation()
+            onRemoveDay()
+          }}
+        >
+          <DeleteOutlineIcon fontSize="small" />
+        </IconButton>
+        {isOpen ? <ExpandLess /> : <ExpandMore />}
+      </ListItemButton>
+      <Collapse in={isOpen} timeout="auto" unmountOnExit>
+        <List component="div" disablePadding>
+          {dayPoints.length > 0 ? (
+            <SortableContext
+              items={dayPoints.map((_, pointIndex) => buildSortablePointId(dayIndex, pointIndex))}
+              strategy={verticalListSortingStrategy}
+            >
+              {dayPoints.map((point, pointIndex) => {
+                const sortableId = buildSortablePointId(dayIndex, pointIndex)
+                const isSelected =
+                  selectedPoint?.dayIndex === dayIndex && selectedPoint?.pointIndex === pointIndex
+                return (
+                  <SortablePointItem
+                    key={sortableId}
+                    id={sortableId}
+                    dayIndex={dayIndex}
+                    pointIndex={pointIndex}
+                    label={renderPointLabel(point, pointIndex)}
+                    isSelected={Boolean(isSelected)}
+                    disableSelection={Boolean(activeDragId)}
+                    isDraggingSource={activeDragId === sortableId}
+                    onSelect={onSelectPoint(point, dayIndex, pointIndex)}
+                    onRemove={() => onRemovePoint(dayIndex, pointIndex)}
+                  />
+                )
+              })}
+            </SortableContext>
+          ) : (
+            <ListItemButton sx={{ pl: 4, cursor: 'default' }} disableTouchRipple>
+              <ListItemText primary="暂无点位" />
+            </ListItemButton>
+          )}
+        </List>
+      </Collapse>
+    </Box>
+  )
+}
 
 const mapPointFromTripPoint = (point: TripDetailPoint): MapPoint | null => {
   const coord = extractCoordinateFromPoint(point)
@@ -262,6 +518,23 @@ const EditTrips = () => {
   const [nameDialogError, setNameDialogError] = useState<string | null>(null)
   const [isFetchingDescription, setIsFetchingDescription] = useState(false)
   const [isFetchingImage, setIsFetchingImage] = useState(false)
+  const theme = useTheme()
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'))
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: {
+      delay: 250,
+      tolerance: 8,
+    },
+  })
+  const sensors = useSensors(pointerSensor)
+  const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(null)
+  const [activeDragData, setActiveDragData] = useState<{
+    id: string
+    dayIndex: number
+    pointIndex: number
+    point: TripDetailPoint | null
+  } | null>(null)
+  const [searchMenuAnchor, setSearchMenuAnchor] = useState<HTMLElement | null>(null)
   const preferredMap = useMemo<'gaode' | 'google'>(() => {
     if (trip?.domestic === 0) return 'google'
     if (trip?.domestic === 1) return 'gaode'
@@ -413,6 +686,7 @@ const EditTrips = () => {
     setSearchValue('')
     setHasSearchAttempt(false)
     mapInstanceRef.current = null
+    setSearchMenuAnchor(null)
   }, [mapProvider])
 
   useEffect(() => {
@@ -422,6 +696,12 @@ const EditTrips = () => {
       void preloadGoogleMap(GOOGLE_MAP_API_KEY)
     }
   }, [mapProvider])
+
+  useEffect(() => {
+    if (!isSmallScreen) {
+      setSearchMenuAnchor(null)
+    }
+  }, [isSmallScreen])
 
   const toggleDrawer = (open: boolean) => () => {
     if (open && drawerDetail.length === 0) return
@@ -538,10 +818,11 @@ const EditTrips = () => {
       pointData,
     })
 
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.setZoomAndCenter(mapZoom, result.location)
-    }
+  if (mapInstanceRef.current) {
+    mapInstanceRef.current.setZoomAndCenter(mapZoom, result.location)
   }
+  setSearchMenuAnchor(null)
+}
 
   const handleClearSearch = useCallback(() => {
     setSearchResults([])
@@ -949,6 +1230,138 @@ const EditTrips = () => {
     setSelectedPoint(null)
   }, [syncTripDetail])
 
+  const handlePointDragStart = useCallback(
+    (event: DragStartEvent) => {
+      setActiveDragId(event.active.id)
+      const meta = parseSortablePointId(event.active.id)
+      if (!meta) {
+        setActiveDragData(null)
+        return
+      }
+      const point =
+        drawerDetail[meta.dayIndex] && drawerDetail[meta.dayIndex][meta.pointIndex]
+          ? drawerDetail[meta.dayIndex][meta.pointIndex]
+          : null
+      setActiveDragData({
+        id: String(event.active.id),
+        dayIndex: meta.dayIndex,
+        pointIndex: meta.pointIndex,
+        point,
+      })
+    },
+    [drawerDetail],
+  )
+
+  const handlePointDragCancel = useCallback(() => {
+    window.setTimeout(() => {
+      setActiveDragId(null)
+      setActiveDragData(null)
+    }, 0)
+  }, [])
+
+  const handlePointDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      window.setTimeout(() => {
+        setActiveDragId(null)
+        setActiveDragData(null)
+      }, 0)
+      if (!over || active.id === over.id) return
+      const activeMeta = parseSortablePointId(active.id)
+      if (!activeMeta) return
+
+      const headerMeta = parseDayHeaderId(over.id)
+      if (headerMeta) {
+        const targetDayIndex = headerMeta.dayIndex
+        if (targetDayIndex < 0 || targetDayIndex === activeMeta.dayIndex) return
+        let movedPoint: TripDetailPoint | null = null
+        let targetPointIndex: number | null = null
+
+        setDrawerDetail((prev) => {
+          if (
+            activeMeta.dayIndex < 0 ||
+            activeMeta.dayIndex >= prev.length ||
+            targetDayIndex >= prev.length
+          ) {
+            return prev
+          }
+
+          const next = prev.map((day) => [...day])
+          const sourceDay = next[activeMeta.dayIndex]
+          const targetDay = next[targetDayIndex]
+          const [extracted] = sourceDay.splice(activeMeta.pointIndex, 1)
+          if (!extracted) return prev
+          next[targetDayIndex] = [...targetDay, extracted]
+          movedPoint = extracted
+          targetPointIndex = next[targetDayIndex].length - 1
+          syncTripDetail(next)
+          return next
+        })
+
+        if (movedPoint != null && targetPointIndex != null) {
+          setExpandedDayKey(targetDayIndex + 1)
+          const mapped = mapPointFromTripPoint(movedPoint)
+          if (mapped && mapInstanceRef.current) {
+            mapInstanceRef.current.setZoomAndCenter(mapZoom, mapped.coord)
+          }
+          setSelectedPoint((prevSelected) => {
+            if (mapped) {
+              return {
+                ...mapped,
+                actionType: 'delete',
+                dayIndex: headerMeta.dayIndex,
+                pointIndex: targetPointIndex!,
+                pointData: movedPoint!,
+              }
+            }
+            if (prevSelected && prevSelected.pointData === movedPoint) {
+              return {
+                ...prevSelected,
+                dayIndex: headerMeta.dayIndex,
+                pointIndex: targetPointIndex!,
+              }
+            }
+            return prevSelected
+          })
+        }
+
+        return
+      }
+
+      const overMeta = parseSortablePointId(over.id)
+      if (!overMeta) return
+      if (activeMeta.dayIndex !== overMeta.dayIndex) return
+      const targetDayIndex = activeMeta.dayIndex
+      let reorderedDay: TripDetailPoint[] | null = null
+
+      setDrawerDetail((prev) => {
+        const next = prev.map((day, di) => {
+          if (di !== targetDayIndex) return day
+          reorderedDay = arrayMove(day, activeMeta.pointIndex, overMeta.pointIndex)
+          return reorderedDay
+        })
+
+        if (reorderedDay) {
+          syncTripDetail(next)
+        }
+
+        return next
+      })
+
+      if (reorderedDay) {
+        setSelectedPoint((prevSelected) => {
+          if (!prevSelected) return prevSelected
+          if (prevSelected.dayIndex !== targetDayIndex) return prevSelected
+          if (!prevSelected.pointData) return prevSelected
+          const nextIndex = reorderedDay!.findIndex((item) => item === prevSelected.pointData)
+          if (nextIndex === -1 || nextIndex === prevSelected.pointIndex) return prevSelected
+          return { ...prevSelected, pointIndex: nextIndex }
+        })
+      }
+    },
+    [mapInstanceRef, mapZoom, setExpandedDayKey, setSelectedPoint, syncTripDetail],
+  )
+
   const mapMarkers = useMemo(() => {
     if (!selectedPoint) return undefined
     return [
@@ -973,6 +1386,122 @@ const EditTrips = () => {
     }
     return `POI ${index + 1}`
   }
+
+  const handleSearchMenuOpen = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      if (!mapProvider) return
+      setSearchMenuAnchor(event.currentTarget)
+    },
+    [mapProvider],
+  )
+
+  const handleSearchMenuClose = useCallback(() => {
+    setSearchMenuAnchor(null)
+  }, [])
+
+  const renderSearchField = (autoFocus = false) => (
+    <Box sx={{ position: 'relative', width: '100%' }}>
+      <TextField
+        value={searchValue}
+        onChange={(event) => {
+          const nextValue = event.target.value
+          setSearchValue(nextValue)
+          setHasSearchAttempt(false)
+          if (!nextValue.trim()) {
+            setSearchResults([])
+            setIsSearching(false)
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            handleSearch()
+          }
+        }}
+        placeholder={mapProvider ? '请输入关键字' : '请先选择地图服务'}
+        size="small"
+        variant="outlined"
+        fullWidth
+        disabled={!mapProvider}
+        autoFocus={autoFocus}
+        sx={{
+          backgroundColor: '#ffffff',
+          borderRadius: 1,
+          '& .MuiOutlinedInput-root': {
+            color: '#4b5563',
+            '& fieldset': {
+              borderColor: 'transparent',
+            },
+            '&:hover fieldset': {
+              borderColor: 'rgba(59, 130, 246, 0.5)',
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: 'rgba(59, 130, 246, 0.8)',
+            },
+          },
+          '& .MuiInputBase-input::placeholder': {
+            color: '#9ca3af',
+          },
+        }}
+      />
+      {isSearching || searchResults.length > 0 || hasSearchAttempt ? (
+        <List
+          sx={{
+            position: 'absolute',
+            top: 'calc(100% + 8px)',
+            left: 0,
+            width: '100%',
+            maxHeight: 240,
+            overflowY: 'auto',
+            backgroundColor: '#ffffff',
+            borderRadius: 1,
+            boxShadow: '0 10px 24px rgba(15, 23, 42, 0.15)',
+            zIndex: 1200,
+            p: 0,
+          }}
+        >
+          {isSearching ? (
+            <ListItem sx={{ px: 2, py: 1.5 }}>
+              <ListItemText
+                primary="搜索中..."
+                primaryTypographyProps={{ fontSize: 13, color: '#6b7280' }}
+              />
+            </ListItem>
+          ) : searchResults.length > 0 ? (
+            <>
+              {searchResults.map((result, index) => (
+                <ListItemButton
+                  key={`${result.name}-${index}`}
+                  onClick={() => handleSearchResultSelect(result)}
+                  sx={{ alignItems: 'flex-start' }}
+                >
+                  <ListItemText
+                    primary={result.name}
+                    secondary={result.address}
+                    primaryTypographyProps={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}
+                    secondaryTypographyProps={{ fontSize: 12, color: '#6b7280' }}
+                  />
+                </ListItemButton>
+              ))}
+              <ListItemButton onClick={handleClearSearch} sx={{ justifyContent: 'center' }}>
+                <ListItemText
+                  primary="清除搜索结果"
+                  primaryTypographyProps={{ fontSize: 13, color: '#2563eb', textAlign: 'center' }}
+                />
+              </ListItemButton>
+            </>
+          ) : hasSearchAttempt ? (
+            <ListItem sx={{ px: 2, py: 1.5 }}>
+              <ListItemText
+                primary={mapProvider ? '未找到相关地点，请尝试其他关键字' : '请先选择地图服务再进行搜索'}
+                primaryTypographyProps={{ fontSize: 13, color: '#6b7280' }}
+              />
+            </ListItem>
+          ) : null}
+        </List>
+      ) : null}
+    </Box>
+  )
 
   const mapProviderButtonLabel = mapProvider
     ? mapProvider === 'gaode'
@@ -1008,6 +1537,26 @@ const EditTrips = () => {
     setSearchResults,
     setTrip,
   ])
+  const mapProviderControl = (
+    <Button
+      variant="outlined"
+      color="inherit"
+      size="small"
+      startIcon={mapProviderButtonIcon}
+      sx={{
+        textTransform: 'none',
+        fontWeight: 600,
+        '&.Mui-disabled': {
+          borderColor: 'rgba(255, 255, 255, 0.4)',
+          color: 'rgba(255, 255, 255, 0.4)',
+        },
+      }}
+      onClick={handleMapProviderButtonClick}
+      disabled={!mapProvider}
+    >
+      {mapProviderButtonLabel}
+    </Button>
+  )
 
   return (
     <>
@@ -1025,6 +1574,7 @@ const EditTrips = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            position: 'relative',
           }}
         >
           <IconButton
@@ -1038,158 +1588,76 @@ const EditTrips = () => {
           <Typography
             variant="h6"
             component="div"
-            sx={{ flexGrow: 1, textAlign: 'center', fontWeight: 600 }}
+            sx={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              fontWeight: 600,
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+            }}
           >
-            地图数据编辑
+            设计
           </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Button
-                variant="outlined"
-                color="inherit"
-                size="small"
-                startIcon={mapProviderButtonIcon}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  '&.Mui-disabled': {
-                    borderColor: 'rgba(255, 255, 255, 0.4)',
-                    color: 'rgba(255, 255, 255, 0.4)',
-                  },
-                }}
-                onClick={handleMapProviderButtonClick}
-                disabled={!mapProvider}
-              >
-                {mapProviderButtonLabel}
-              </Button>
-              <Box sx={{ position: 'relative', width: 200 }}>
-                <TextField
-                  value={searchValue}
-                  onChange={(event) => {
-                    const nextValue = event.target.value
-                    setSearchValue(nextValue)
-                    setHasSearchAttempt(false)
-                    if (!nextValue.trim()) {
-                      setSearchResults([])
-                      setIsSearching(false)
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      handleSearch()
-                    }
-                  }}
-                  placeholder={mapProvider ? '请输入关键字' : '请先选择地图服务'}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            {mapProviderControl}
+            {isSmallScreen ? (
+              <>
+                <IconButton
+                  color="inherit"
                   size="small"
-                  variant="outlined"
-                  fullWidth
+                  onClick={handleSearchMenuOpen}
                   disabled={!mapProvider}
-                  sx={{
-                  backgroundColor: '#ffffff',
-                  borderRadius: 1,
-                  '& .MuiOutlinedInput-root': {
-                    color: '#4b5563',
-                    '& fieldset': {
-                      borderColor: 'transparent',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: 'rgba(59, 130, 246, 0.5)',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: 'rgba(59, 130, 246, 0.8)',
-                    },
-                  },
-                  '& .MuiInputBase-input::placeholder': {
-                    color: '#9ca3af',
-                  },
-                }}
-              />
-                  {isSearching || searchResults.length > 0 || hasSearchAttempt ? (
-                    <List
-                      sx={{
-                        position: 'absolute',
-                        top: 'calc(100% + 8px)',
-                        left: 0,
-                        width: '100%',
-                        overflowY: 'auto',
-                    backgroundColor: '#ffffff',
-                    borderRadius: 1,
-                    boxShadow: '0 10px 24px rgba(15, 23, 42, 0.15)',
-                    zIndex: 1200,
-                    p: 0,
-                  }}
+                  aria-label="打开搜索"
                 >
-                  {isSearching ? (
-                    <ListItem sx={{ px: 2, py: 1.5 }}>
-                      <ListItemText
-                        primary="搜索中..."
-                        primaryTypographyProps={{ fontSize: 13, color: '#6b7280' }}
-                      />
-                    </ListItem>
-                  ) : searchResults.length > 0 ? (
-                    <>
-                      {searchResults.map((result, index) => (
-                        <ListItemButton
-                          key={`${result.name}-${index}`}
-                          onClick={() => handleSearchResultSelect(result)}
-                          sx={{ alignItems: 'flex-start' }}
-                        >
-                          <ListItemText
-                            primary={result.name}
-                            secondary={result.address}
-                            primaryTypographyProps={{ fontSize: 14, fontWeight: 600, color: '#1f2937' }}
-                            secondaryTypographyProps={{ fontSize: 12, color: '#6b7280' }}
-                          />
-                        </ListItemButton>
-                      ))}
-                      <ListItemButton onClick={handleClearSearch} sx={{ justifyContent: 'center' }}>
-                        <ListItemText
-                          primary="清除搜索结果"
-                          primaryTypographyProps={{ fontSize: 13, color: '#2563eb', textAlign: 'center' }}
-                        />
-                      </ListItemButton>
-                    </>
-                  ) : hasSearchAttempt ? (
-                    <ListItem sx={{ px: 2, py: 1.5 }}>
-                      <ListItemText
-                        primary={mapProvider ? '未找到相关地点，请尝试其他关键字' : '请先选择地图服务再进行搜索'}
-                        primaryTypographyProps={{ fontSize: 13, color: '#6b7280' }}
-                      />
-                    </ListItem>
-                  ) : null}
-                </List>
-              ) : null}
-            </Box>
-              <Button
-                variant="text"
-                color="inherit"
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  '&.Mui-disabled': {
-                    color: 'rgba(255, 255, 255, 0.5)',
-                  },
-                }}
-                disabled={!trip || isSavingTrip}
-                onClick={handleAppBarSave}
-              >
-              {isSavingTrip ? <CircularProgress size={16} color="inherit" /> : '保存'}
-            </Button>
-            <IconButton
-              edge="end"
+                  <SearchIcon />
+                </IconButton>
+                <Menu
+                  anchorEl={searchMenuAnchor}
+                  open={Boolean(searchMenuAnchor)}
+                  onClose={handleSearchMenuClose}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                  PaperProps={{ sx: { width: 260, p: 1 } }}
+                >
+                  {renderSearchField(true)}
+                </Menu>
+              </>
+            ) : (
+              <Box sx={{ width: 200 }}>{renderSearchField()}</Box>
+            )}
+            <Button
+              variant="text"
               color="inherit"
-              aria-label="展开行程列表"
-              onClick={toggleDrawer(true)}
-              disabled={drawerDetail.length === 0}
               sx={{
+                textTransform: 'none',
+                fontWeight: 600,
                 '&.Mui-disabled': {
-                  color: 'rgba(255, 255, 255, 0.4)',
+                  color: 'rgba(255, 255, 255, 0.5)',
                 },
               }}
+              disabled={!trip || isSavingTrip}
+              onClick={handleAppBarSave}
             >
-              <MenuIcon />
-            </IconButton>
+              {isSavingTrip ? <CircularProgress size={16} color="inherit" /> : '保存'}
+            </Button>
           </Box>
+
+          <IconButton
+            edge="end"
+            color="inherit"
+            aria-label="展开行程列表"
+            onClick={toggleDrawer(true)}
+            disabled={drawerDetail.length === 0}
+            sx={{
+              '&.Mui-disabled': {
+                color: 'rgba(255, 255, 255, 0.4)',
+              },
+            }}
+          >
+            <MenuIcon />
+          </IconButton>
         </Toolbar>
       </AppBar>
       <Drawer
@@ -1239,70 +1707,66 @@ const EditTrips = () => {
           </Box>
           <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
             {drawerDetail.length > 0 ? (
-              <List disablePadding>
-                {drawerDetail.map((dayPoints, dayIndex) => {
-                  const dayKey = dayIndex + 1
-                  const isOpen = expandedDayKey === dayKey
-                  return (
-                    <Box key={dayKey}>
-                      <ListItemButton
-                        onClick={toggleDay(dayKey)}
-                        sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                onDragStart={handlePointDragStart}
+                onDragEnd={handlePointDragEnd}
+                onDragCancel={handlePointDragCancel}
+              >
+                <List disablePadding>
+                  {drawerDetail.map((dayPoints, dayIndex) => {
+                    const dayKey = dayIndex + 1
+                    const isOpen = expandedDayKey === dayKey
+                    return (
+                      <DaySection
+                        key={dayKey}
+                        dayIndex={dayIndex}
+                        dayKey={dayKey}
+                        dayPoints={dayPoints}
+                        isOpen={Boolean(isOpen)}
+                        activeDragId={activeDragId}
+                        selectedPoint={selectedPoint}
+                        toggleDay={toggleDay(dayKey)}
+                        onRemoveDay={() => handleRemoveDay(dayIndex)}
+                        onSelectPoint={handlePointSelect}
+                        onRemovePoint={handleRemovePoint}
+                        renderPointLabel={renderPointLabel}
+                      />
+                    )
+                  })}
+                </List>
+                <DragOverlay dropAnimation={null}>
+                  {activeDragData ? (
+                    <Paper
+                      elevation={8}
+                      sx={{
+                        px: 2.5,
+                        py: 1,
+                        borderRadius: 1.5,
+                        backgroundColor: 'rgba(37, 99, 235, 0.92)',
+                        color: '#ffffff',
+                        minWidth: 180,
+                        maxWidth: 260,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
                       >
-                        <ListItemText primary={`第 ${dayKey} 天`} sx={{ flexGrow: 1 }} />
-                        <IconButton
-                          edge="end"
-                          size="small"
-                          sx={{ ml: 1 }}
-                          color="error"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            handleRemoveDay(dayIndex)
-                          }}
-                        >
-                          <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
-                        {isOpen ? <ExpandLess /> : <ExpandMore />}
-                      </ListItemButton>
-                      <Collapse in={isOpen} timeout="auto" unmountOnExit>
-                        <List component="div" disablePadding>
-                          {dayPoints.length > 0 ? (
-                            dayPoints.map((point, pointIndex) => (
-                              <ListItemButton
-                                key={`${dayIndex}-${pointIndex}`}
-                                sx={{ pl: 4, display: 'flex', alignItems: 'center', gap: 1 }}
-                                onClick={handlePointSelect(point, dayIndex, pointIndex)}
-                              >
-                                <ListItemText
-                                  primary={renderPointLabel(point, pointIndex)}
-                                  sx={{ flexGrow: 1 }}
-                                />
-                                <IconButton
-                                  edge="end"
-                                  size="small"
-                                  sx={{ ml: 1 }}
-                                  color="error"
-                                  onPointerDown={(event) => event.stopPropagation()}
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    handleRemovePoint(dayIndex, pointIndex)
-                                  }}
-                                >
-                                  <DeleteOutlineIcon fontSize="small" />
-                                </IconButton>
-                              </ListItemButton>
-                            ))
-                          ) : (
-                            <ListItemButton sx={{ pl: 4, cursor: 'default' }} disableTouchRipple>
-                              <ListItemText primary="暂无点位" />
-                            </ListItemButton>
-                          )}
-                        </List>
-                      </Collapse>
-                    </Box>
-                  )
-                })}
-              </List>
+                        {activeDragData.point
+                          ? renderPointLabel(activeDragData.point, activeDragData.pointIndex)
+                          : `POI ${activeDragData.pointIndex + 1}`}
+                      </Typography>
+                    </Paper>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
             ) : (
               <Box sx={{ px: 2, py: 3 }}>
                 <Alert severity="info">该行程暂无详细点位数据。</Alert>

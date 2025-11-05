@@ -16,6 +16,7 @@ import Chip from '@mui/material/Chip'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { SyntheticEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 
 import PageSwitcher from '../components/PageSwitcher.tsx'
 import { ALL_TRIPS_FALLBACK_PAGE_SIZE } from '../constants/app.ts'
@@ -182,7 +183,7 @@ const AllTrips = () => {
         backgroundColor: '#f4f6fb',
       }}
     >
-      <AppBar position="static" color="primary" elevation={2}>
+      <AppBar position="fixed" color="primary" elevation={2}>
         <Toolbar
           sx={{
             display: 'flex',
@@ -208,6 +209,7 @@ const AllTrips = () => {
           <Box sx={{ width: 40, height: 40 }} aria-hidden />
         </Toolbar>
       </AppBar>
+      <Toolbar />
 
       <Box
         sx={{
@@ -257,103 +259,120 @@ const AllTrips = () => {
                       px: { xs: 2, md: 3 },
                       alignItems: 'flex-start',
                       gap: { xs: 2, md: 3 },
-                      cursor: 'pointer',
                     }}
-                    onClick={() => handleTripClick(trip)}
-                  >
-                    <ListItemAvatar sx={{ mr: 0 }}>
-                      <Avatar
-                        src={coverFromDetail || undefined}
-                        alt={trip.tripName || '行程封面'}
-                        variant="rounded"
-                        sx={{
-                          width: 96,
-                          height: 64,
-                          borderRadius: 2,
-                          backgroundColor: '#e2e8f0',
-                        }}
-                        imgProps={{
-                          onError: handleAvatarError,
-                          referrerPolicy: 'no-referrer',
-                        }}
-                      />
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                          {trip.tripName || '未命名行程'}
-                        </Typography>
-                      }
-                      primaryTypographyProps={{ color: 'rgba(15, 23, 42, 0.85)' }}
-                      secondary={
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 0.5,
-                            mt: 1,
+                    secondaryAction={
+                      trip._id ? (
+                        <IconButton
+                          edge="end"
+                          color="error"
+                          aria-label="删除行程"
+                          onClick={() => {
+                            console.log('[AllTrips] 删除行程 _id:', trip._id)
                           }}
                         >
+                          <DeleteOutlineIcon />
+                        </IconButton>
+                      ) : null
+                    }
+                  >
+                    <Box
+                      sx={{ display: 'flex', gap: { xs: 2, md: 3 }, flexGrow: 1, cursor: 'pointer' }}
+                      onClick={() => handleTripClick(trip)}
+                    >
+                      <ListItemAvatar sx={{ mr: 0 }}>
+                        <Avatar
+                          src={coverFromDetail || undefined}
+                          alt={trip.tripName || '行程封面'}
+                          variant="rounded"
+                          sx={{
+                            width: 96,
+                            height: 64,
+                            borderRadius: 2,
+                            backgroundColor: '#e2e8f0',
+                          }}
+                          imgProps={{
+                            onError: handleAvatarError,
+                            referrerPolicy: 'no-referrer',
+                          }}
+                        />
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                            {trip.tripName || '未命名行程'}
+                          </Typography>
+                        }
+                        primaryTypographyProps={{ color: 'rgba(15, 23, 42, 0.85)' }}
+                        secondary={
                           <Box
                             sx={{
                               display: 'flex',
                               flexDirection: 'column',
                               gap: 0.5,
+                              mt: 1,
                             }}
                           >
-                            <Typography
-                              variant="body2"
-                              sx={{ color: 'rgba(15, 23, 42, 0.65)' }}
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 0.5,
+                              }}
                             >
-                              {`${trip.country || '未知国家'} · ${
-                                trip.city || '未知城市'
-                              }`}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              sx={{ color: 'rgba(15, 23, 42, 0.5)' }}
-                            >
-                              {tripDays > 0 ? `${tripDays} 日行程` : '行程天数未知'}
-                            </Typography>
-                          </Box>
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1,
-                              flexWrap: 'wrap',
-                            }}
-                          >
-                            {tags.length > 0 ? (
-                              <Box
-                                sx={{
-                                  display: 'flex',
-                                  gap: 0.75,
-                                  flexWrap: 'wrap',
-                                }}
+                              <Typography
+                                variant="body2"
+                                sx={{ color: 'rgba(15, 23, 42, 0.65)' }}
                               >
-                                {tags.map((tag) => (
-                                  <Chip
-                                    key={tag}
-                                    label={tag}
-                                    size="small"
-                                    color="primary"
-                                    variant="outlined"
-                                  />
-                                ))}
-                              </Box>
-                            ) : null}
-                            <Typography
-                              variant="caption"
-                              sx={{ color: 'rgba(15, 23, 42, 0.5)' }}
+                                {`${trip.country || '未知国家'} · ${
+                                  trip.city || '未知城市'
+                                }`}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                sx={{ color: 'rgba(15, 23, 42, 0.5)' }}
+                              >
+                                {tripDays > 0 ? `${tripDays} 日行程` : '行程天数未知'}
+                              </Typography>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                flexWrap: 'wrap',
+                              }}
                             >
-                              行程点位：{detailCount}
-                            </Typography>
+                              {tags.length > 0 ? (
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 0.75,
+                                    flexWrap: 'wrap',
+                                  }}
+                                >
+                                  {tags.map((tag) => (
+                                    <Chip
+                                      key={tag}
+                                      label={tag}
+                                      size="small"
+                                      color="primary"
+                                      variant="outlined"
+                                    />
+                                  ))}
+                                </Box>
+                              ) : null}
+                              <Typography
+                                variant="caption"
+                                sx={{ color: 'rgba(15, 23, 42, 0.5)' }}
+                              >
+                                行程点位：{detailCount}
+                              </Typography>
+                            </Box>
                           </Box>
-                        </Box>
-                      }
-                      secondaryTypographyProps={{ component: 'div' }}
-                    />
+                        }
+                        secondaryTypographyProps={{ component: 'div' }}
+                      />
+                    </Box>
                   </ListItem>
                   {index < trips.length - 1 ? (
                     <Divider component="li" sx={{ borderColor: 'rgba(15, 23, 42, 0.08)' }} />
