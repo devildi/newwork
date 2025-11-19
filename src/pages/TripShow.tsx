@@ -113,12 +113,18 @@ const buildTransferLinks = (
 ) => {
   const [lng, lat] = coord
   const encodedName = encodeURIComponent(title || '目的地')
+
   if (isDomestic) {
-    const scheme = `amapuri://route/plan/?dlat=${lat}&dlon=${lng}&dname=${encodedName}&dev=0&t=0`
-    return { scheme }
+    return {
+      scheme: `amapuri://route/plan/?dlat=${lat}&dlon=${lng}&dname=${encodedName}&dev=0&t=0`,
+      fallback: `https://uri.amap.com/marker?position=${lng},${lat}&name=${encodedName}`,
+    }
   }
-  const scheme = `comgooglemaps://?daddr=${lat},${lng}&directionsmode=transit`
-  return { scheme }
+
+  return {
+    scheme: `comgooglemaps://?daddr=${lat},${lng}&directionsmode=transit`,
+    fallback: `https://www.google.com/maps/dir/?api=1&destination=${lat}%2C${lng}&travelmode=transit`,
+  }
 }
 
 const openTransferApp = (
@@ -127,14 +133,54 @@ const openTransferApp = (
   isDomestic: boolean,
   handleUnavailable: () => void,
 ) => {
-  const { scheme } = buildTransferLinks(coord, title, isDomestic)
+  const { scheme, fallback } = buildTransferLinks(coord, title, isDomestic)
   const isMobile = /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent)
 
+  const openFallback = () => {
+    if (fallback) {
+      window.location.href = fallback
+    } else {
+      handleUnavailable()
+    }
+  }
+
   if (!isMobile) {
-    handleUnavailable()
+    if (fallback) {
+      window.open(fallback, '_blank', 'noopener')
+    } else {
+      handleUnavailable()
+    }
     return
   }
-  window.location.href = scheme
+
+  let fallbackTimer: number | null = null
+  const handleVisibilityChange = () => {
+    if (document.hidden && fallbackTimer !== null) {
+      window.clearTimeout(fallbackTimer)
+      fallbackTimer = null
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }
+
+  if (fallback) {
+    fallbackTimer = window.setTimeout(() => {
+      fallbackTimer = null
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      openFallback()
+    }, 2500)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+  }
+
+  try {
+    window.location.href = scheme
+  } catch (error) {
+    if (fallbackTimer !== null) {
+      window.clearTimeout(fallbackTimer)
+      fallbackTimer = null
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+    openFallback()
+  }
 }
 
 const resolveMarker = (
@@ -275,7 +321,7 @@ const TripShow = () => {
         backgroundColor: '#f4f6fb',
       }}
     >
-      <AppBar position="static" color="primary" elevation={2}>
+      <AppBar position="fixed" color="primary" elevation={2}>
         <Toolbar
           sx={{
             display: 'flex',
@@ -299,6 +345,7 @@ const TripShow = () => {
           </IconButton>
         </Toolbar>
       </AppBar>
+      <Toolbar />
       <Box
         sx={{
           flexGrow: 1,

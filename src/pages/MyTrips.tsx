@@ -60,7 +60,7 @@ const buildTripSubtitle = (trip: TripRecord) => {
 
 const MyTrips = () => {
   const navigate = useNavigate()
-  const [trips, setTrips] = useState<TripRecord[]>([])
+  const [trips, setTrips] = useState<TripRecord[] | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [isFetchingMore, setIsFetchingMore] = useState(false)
@@ -101,10 +101,11 @@ const MyTrips = () => {
           } else {
             let appendedLength = 0
             setTrips((prev) => {
-              const existingIds = new Set(prev.map((item) => item._id))
+              const previous = prev ?? []
+              const existingIds = new Set(previous.map((item) => item._id))
               const appended = nextTrips.filter((item) => !existingIds.has(item._id))
               appendedLength = appended.length
-              return appended.length > 0 ? [...prev, ...appended] : prev
+              return appended.length > 0 ? [...previous, ...appended] : previous
             })
             setHasMore(appendedLength > 0)
           }
@@ -142,7 +143,8 @@ const MyTrips = () => {
     return () => controller.abort()
   }, [currentPage, fetchTrips])
 
-  const hasTrips = useMemo(() => trips.length > 0, [trips])
+  const hasTrips = useMemo(() => (trips?.length ?? 0) > 0, [trips])
+  const isLoadingView = isInitialLoading || trips === null
 
   useEffect(() => {
     if (!hasMore) return
@@ -195,21 +197,23 @@ const MyTrips = () => {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: isInitialLoading ? 'center' : 'flex-start',
+          justifyContent: 'flex-start',
           px: { xs: 2, sm: 4 },
           py: { xs: 3, sm: 4 },
           gap: 3,
         }}
       >
-        {isInitialLoading ? (
-          <CircularProgress size={48} />
+        {isLoadingView ? (
+          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress size={48} />
+          </Box>
         ) : errorMessage ? (
           <Alert severity="error" sx={{ width: '100%', maxWidth: 640 }}>
             {errorMessage}
           </Alert>
         ) : hasTrips ? (
           <Stack spacing={3} sx={{ width: '100%', maxWidth: 880}}>
-            {trips.map((trip) => {
+            {(trips ?? []).map((trip) => {
               const cover = extractFirstPoiImage(trip.detail)
               const subtitle = buildTripSubtitle(trip)
               return (

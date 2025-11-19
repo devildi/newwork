@@ -1701,7 +1701,13 @@ const EditTrips = () => {
         anchor="right"
         open={isDrawerOpen}
         onClose={toggleDrawer(false)}
-        PaperProps={{ sx: { width: 320, maxWidth: '85vw' } }}
+        PaperProps={{
+          sx: {
+            width: 320,
+            maxWidth: '85vw',
+            height: { xs: '100svh', sm: '100vh' },
+          },
+        }}
       >
         <Box
           sx={{

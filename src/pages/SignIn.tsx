@@ -27,6 +27,14 @@ const SignIn = () => {
   }, [dispatch])
 
   useEffect(() => {
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = originalOverflow
+    }
+  }, [])
+
+  useEffect(() => {
     if (!errorMessage) return
 
     const timer = window.setTimeout(() => {
@@ -118,13 +126,14 @@ const SignIn = () => {
 
   return (
     <Box
-    sx={{
-      position: 'relative',
-      minHeight: '100vh',
-      overflow: 'hidden',
-      color: '#ffffff',
-    }}
-  >
+      sx={{
+        position: 'relative',
+        minHeight: { xs: '100svh', md: '100vh' },
+        height: { xs: '100svh', md: '100vh' },
+        overflow: 'hidden',
+        color: '#ffffff',
+      }}
+    >
     <Box
       component="video"
       autoPlay
@@ -153,8 +162,10 @@ const SignIn = () => {
       sx={{
         position: 'relative',
         zIndex: 1,
-        minHeight: '100vh',
+        minHeight: { xs: '100svh', md: '100vh' },
+        height: { xs: '100svh', md: '100vh' },
         px: 2,
+        overflow: 'hidden',
       }}
     >
       <Box
@@ -171,7 +182,7 @@ const SignIn = () => {
           sx={{
             maxWidth: 400,
             width: '100%',
-            p: 5,
+            p: { xs: 3, sm: 5 },
             backdropFilter: 'blur(8px)',
             backgroundColor: 'rgba(12, 21, 31, 0.6)',
           }}
@@ -201,7 +212,7 @@ const SignIn = () => {
                 component={RouterLink}
                 to="/logon"
                 variant="text"
-                size="small"
+                size="medium"
                 sx={{
                   color: 'rgba(255,255,255,0.75)',
                   textTransform: 'none',
@@ -224,6 +235,7 @@ const SignIn = () => {
               <TextField
                 label="用户名"
                 type="text"
+                size="medium"
                 variant="filled"
                 name="name"
                 value={formValues.name}
@@ -246,6 +258,7 @@ const SignIn = () => {
               <TextField
                 label="密码"
                 type="password"
+                size="small"
                 variant="filled"
                 name="password"
                 value={formValues.password}
@@ -270,7 +283,7 @@ const SignIn = () => {
               type="submit"
               variant="contained"
               size="large"
-              sx={{ borderRadius: 999, py: 1.5, fontWeight: 600 }}
+              sx={{ borderRadius: 999, py: { xs: 1, sm: 1.5 }, fontWeight: 600 }}
             >
               登录
             </Button>

@@ -31,6 +31,14 @@ const Logon = () => {
   }, [dispatch])
 
   useEffect(() => {
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = originalOverflow
+    }
+  }, [])
+
+  useEffect(() => {
     if (!errorMessage) return
 
     const timer = window.setTimeout(() => {
@@ -112,45 +120,48 @@ const Logon = () => {
 
   return (
     <Box
-    sx={{
-      position: 'relative',
-      minHeight: '100vh',
-      overflow: 'hidden',
-      color: '#ffffff',
-    }}
-  >
-    <Box
-      component="video"
-      autoPlay
-      muted
-      loop
-      playsInline
-      src={AUTH_BACKGROUND_VIDEO}
-      aria-hidden
-      sx={{
-        position: 'absolute',
-        inset: 0,
-        width: '100%',
-        height: '100%',
-        objectFit: 'cover',
-      }}
-    />
-    <Box
-      sx={{
-        position: 'absolute',
-        inset: 0,
-        background: 'rgba(0, 0, 0, 0.45)',
-      }}
-    />
-
-    <Stack
       sx={{
         position: 'relative',
-        zIndex: 1,
-        minHeight: '100vh',
-        px: 2,
+        minHeight: { xs: '100svh', md: '100vh' },
+        height: { xs: '100svh', md: '100vh' },
+        overflow: 'hidden',
+        color: '#ffffff',
       }}
     >
+      <Box
+        component="video"
+        autoPlay
+        muted
+        loop
+        playsInline
+        src={AUTH_BACKGROUND_VIDEO}
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+        }}
+      />
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.45)',
+        }}
+      />
+
+      <Stack
+        sx={{
+          position: 'relative',
+          zIndex: 1,
+          minHeight: { xs: '100svh', md: '100vh' },
+          height: { xs: '100svh', md: '100vh' },
+          px: 2,
+          overflow: 'hidden',
+        }}
+      >
       <Box
         sx={{
           flex: 1,

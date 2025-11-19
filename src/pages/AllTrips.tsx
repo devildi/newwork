@@ -93,10 +93,10 @@ const computeTripDays = (detail: TripRecord['detail']) => {
 
 const AllTrips = () => {
   const navigate = useNavigate()
-  const [trips, setTrips] = useState<TripRecord[]>([])
+  const [trips, setTrips] = useState<TripRecord[] | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState<number | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [confirmingTrip, setConfirmingTrip] = useState<TripRecord | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -161,7 +161,8 @@ const AllTrips = () => {
     return () => controller.abort()
   }, [currentPage, reloadKey])
 
-  const hasTrips = useMemo(() => trips.length > 0, [trips])
+  const hasTrips = useMemo(() => (trips?.length ?? 0) > 0, [trips])
+  const isLoadingView = isLoading || trips === null
   const disablePrev = currentPage <= 1 || isLoading || !!errorMessage
   const disableNext =
     isLoading ||
@@ -312,7 +313,7 @@ const AllTrips = () => {
           py: { xs: 2, md: 3 },
         }}
       >
-        {isLoading ? (
+        {isLoadingView ? (
           <Box
             sx={{
               height: '100%',
@@ -333,7 +334,7 @@ const AllTrips = () => {
               boxShadow: '0 18px 40px rgba(15, 23, 42, 0.08)',
             }}
           >
-            {trips.map((trip, index) => {
+            {(trips ?? []).map((trip, index) => {
               const tags = trip.tags
                 ? trip.tags
                     .split(/[，,|/]/)
@@ -471,7 +472,7 @@ const AllTrips = () => {
                       />
                     </Box>
                   </ListItem>
-                  {index < trips.length - 1 ? (
+                  {index < (trips?.length ?? 0) - 1 ? (
                     <Divider component="li" sx={{ borderColor: 'rgba(15, 23, 42, 0.08)' }} />
                   ) : null}
                 </Fragment>

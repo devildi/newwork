@@ -9,8 +9,8 @@ type InfoWindowParams = {
 
 const createInfoWindowContent = (item: InfoWindowParams) => {
   const container = document.createElement('div')
-  container.style.width = '240px'
-  container.style.maxWidth = '240px'
+  container.style.width = 'min(260px, calc(100vw - 48px))'
+  container.style.maxWidth = '100%'
   container.style.background = '#fff'
   container.style.borderRadius = '10px'
   container.style.boxShadow = '0 10px 24px rgba(15, 23, 42, 0.18)'
@@ -23,6 +23,7 @@ const createInfoWindowContent = (item: InfoWindowParams) => {
   container.style.color = '#1f2937'
   container.style.pointerEvents = 'auto'
   container.style.cursor = 'pointer'
+  container.style.overflowX = 'hidden'
 
   const header = document.createElement('div')
   header.style.display = 'flex'
@@ -68,6 +69,7 @@ const createInfoWindowContent = (item: InfoWindowParams) => {
     description.textContent = item.description
     description.style.color = '#4b5563'
     description.style.lineHeight = '1.4'
+    description.style.wordBreak = 'break-word'
     container.appendChild(description)
   }
 

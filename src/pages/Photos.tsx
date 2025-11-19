@@ -43,10 +43,10 @@ const ArrowBackIcon = () => (
 
 const Photos = () => {
   const navigate = useNavigate()
-  const [photos, setPhotos] = useState<PhotoRecord[]>([])
+  const [photos, setPhotos] = useState<PhotoRecord[] | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState<number | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [previewPhoto, setPreviewPhoto] = useState<PhotoRecord | null>(null)
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false)
@@ -122,7 +122,8 @@ const Photos = () => {
     )
   }
 
-  const hasPhotos = useMemo(() => photos.length > 0, [photos])
+  const hasPhotos = useMemo(() => (photos?.length ?? 0) > 0, [photos])
+  const isLoadingView = isLoading || photos === null
   const disablePrev = currentPage <= 1 || isLoading || !!errorMessage
   const disableNext =
     isLoading ||
@@ -160,7 +161,7 @@ const Photos = () => {
 
       await response.json()
 
-      setPhotos((prev) => prev.filter((photo) => photo._id !== targetId))
+      setPhotos((prev) => (prev ? prev.filter((photo) => photo._id !== targetId) : prev))
       setPreviewPhoto(null)
       setDeleteFeedback({
         open: true,
@@ -217,7 +218,7 @@ const Photos = () => {
       <Toolbar />
 
       <Box sx={{ px: { xs: 2, sm: 3, lg: 6 }, py: { xs: 3, md: 4 }, flexGrow: 1 }}>
-        {isLoading ? (
+        {isLoadingView ? (
           <Box
             sx={{
               height: '100%',
@@ -244,7 +245,7 @@ const Photos = () => {
               },
             }}
           >
-            {photos.map((photo) => (
+            {(photos ?? []).map((photo) => (
               <Paper
                 key={photo._id}
                 elevation={1}

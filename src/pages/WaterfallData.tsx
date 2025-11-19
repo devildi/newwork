@@ -45,10 +45,10 @@ const ArrowBackIcon = () => (
 
 const WaterfallData = () => {
   const navigate = useNavigate()
-  const [stories, setStories] = useState<StoryRecord[]>([])
+  const [stories, setStories] = useState<StoryRecord[] | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState<number | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null)
   const [deleteFeedback, setDeleteFeedback] = useState<{
@@ -113,7 +113,8 @@ const WaterfallData = () => {
     return () => controller.abort()
   }, [currentPage])
 
-  const hasStories = useMemo(() => stories.length > 0, [stories])
+  const hasStories = useMemo(() => (stories?.length ?? 0) > 0, [stories])
+  const isLoadingView = isLoading || stories === null
   const disablePrev = currentPage <= 1 || isLoading || !!errorMessage
   const disableNext =
     isLoading ||
@@ -176,7 +177,7 @@ const WaterfallData = () => {
             ? ((data as { _id?: string })._id as string)
             : story._id
 
-        setStories((prev) => prev.filter((item) => item._id !== deletedId))
+        setStories((prev) => (prev ? prev.filter((item) => item._id !== deletedId) : prev))
         setDeleteFeedback({
           open: true,
           message: '删除成功。',
@@ -239,7 +240,7 @@ const WaterfallData = () => {
           py: { xs: 2, md: 3 },
         }}
       >
-        {isLoading ? (
+        {isLoadingView ? (
           <Box
             sx={{
               height: '100%',
@@ -260,7 +261,7 @@ const WaterfallData = () => {
               boxShadow: '0 18px 40px rgba(15, 23, 42, 0.08)',
             }}
           >
-            {stories.map((story, index) => (
+            {(stories ?? []).map((story, index) => (
               <Box key={story._id} component="li" sx={{ listStyle: 'none' }}>
                 <ListItem
                   sx={{

@@ -36,9 +36,9 @@ const ArrowBackIcon = () => (
 
 const Preview = () => {
   const navigate = useNavigate()
-  const [images, setImages] = useState<PreviewImage[]>([])
+  const [images, setImages] = useState<PreviewImage[] | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null)
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
@@ -100,10 +100,11 @@ const Preview = () => {
     return () => controller.abort()
   }, [])
 
+  const imageCount = images?.length ?? 0
   const totalPages = useMemo(() => {
-    if (!images.length) return 1
-    return Math.max(1, Math.ceil(images.length / PREVIEW_PAGE_SIZE))
-  }, [images.length])
+    if (!imageCount) return 1
+    return Math.max(1, Math.ceil(imageCount / PREVIEW_PAGE_SIZE))
+  }, [imageCount])
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -124,12 +125,14 @@ const Preview = () => {
 
   const pageSlice = useMemo(() => {
     const start = (currentPage - 1) * PREVIEW_PAGE_SIZE
-    return images.slice(start, start + PREVIEW_PAGE_SIZE)
+    const source = images ?? []
+    return source.slice(start, start + PREVIEW_PAGE_SIZE)
   }, [images, currentPage])
 
   const pageStartIndex = (currentPage - 1) * PREVIEW_PAGE_SIZE
 
   const hasImages = pageSlice.length > 0
+  const isLoadingView = isLoading || images === null
 
   const disablePrev = currentPage <= 1 || isLoading || !!errorMessage
   const disableNext =
@@ -207,7 +210,7 @@ const Preview = () => {
       }
 
       setImages((prev) => {
-        if (!prev[selectedIndex]) return prev
+        if (!prev || !prev[selectedIndex]) return prev
         if (prev[selectedIndex].url === trimmed) return prev
         const next = [...prev]
         next[selectedIndex] = { ...next[selectedIndex], url: trimmed }
@@ -301,7 +304,7 @@ const Preview = () => {
       })
       if (selectedIndex !== null) {
         setImages((prev) => {
-          if (!prev[selectedIndex]) return prev
+          if (!prev || !prev[selectedIndex]) return prev
           if (prev[selectedIndex].url === nextUrl) return prev
           const next = [...prev]
           next[selectedIndex] = { ...next[selectedIndex], url: nextUrl }
@@ -317,7 +320,7 @@ const Preview = () => {
   }
 
   const renderGrid = () => {
-    if (isLoading) {
+    if (isLoadingView) {
       return (
         <Box
           sx={{
@@ -588,7 +591,7 @@ const Preview = () => {
                       })
                       if (selectedIndex !== null && normalized.length > 0) {
                         setImages((prev) => {
-                          if (!prev[selectedIndex]) return prev
+                          if (!prev || !prev[selectedIndex]) return prev
                           if (prev[selectedIndex].url === normalized) return prev
                           const next = [...prev]
                           next[selectedIndex] = {
