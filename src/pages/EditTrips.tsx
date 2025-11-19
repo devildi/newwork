@@ -18,6 +18,7 @@ import ListItemButton from '@mui/material/ListItemButton'
 import ListItemText from '@mui/material/ListItemText'
 import Paper from '@mui/material/Paper'
 import Snackbar from '@mui/material/Snackbar'
+import Fab from '@mui/material/Fab'
 import Stack from '@mui/material/Stack'
 import SvgIcon from '@mui/material/SvgIcon'
 import TextField from '@mui/material/TextField'
@@ -39,9 +40,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type MouseEvent,
 } from 'react'
-import Menu from '@mui/material/Menu'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import {
@@ -70,6 +69,7 @@ import { preloadGoogleMap } from '../utils/googleMapsLoader.ts'
 import type { SearchResult } from '../components/GaodeMap.tsx'
 import { preloadGaodeMap } from '../utils/amapLoader.ts'
 import { useAppSelector } from '../app/hooks.ts'
+import { GAODE_MAP_API_KEY, GOOGLE_MAP_API_KEY } from '../constants/map.ts'
 
 const ArrowBackIcon = () => (
   <SvgIcon>
@@ -129,9 +129,6 @@ type TripState = {
   domestic?: number | null
   detail?: unknown
 }
-
-const GAODE_MAP_API_KEY = 'fbe59813637de60223e3d22805a2486c'
-const GOOGLE_MAP_API_KEY = 'AIzaSyB5LS2bbGE_Iw1e7Dc3_al7glDliILip_c'
 
 const buildSortablePointId = (dayIndex: number, pointIndex: number): string =>
   `day-${dayIndex}-point-${pointIndex}`
@@ -534,7 +531,6 @@ const EditTrips = () => {
     pointIndex: number
     point: TripDetailPoint | null
   } | null>(null)
-  const [searchMenuAnchor, setSearchMenuAnchor] = useState<HTMLElement | null>(null)
   const preferredMap = useMemo<'gaode' | 'google'>(() => {
     if (trip?.domestic === 0) return 'google'
     if (trip?.domestic === 1) return 'gaode'
@@ -686,7 +682,6 @@ const EditTrips = () => {
     setSearchValue('')
     setHasSearchAttempt(false)
     mapInstanceRef.current = null
-    setSearchMenuAnchor(null)
   }, [mapProvider])
 
   useEffect(() => {
@@ -696,12 +691,6 @@ const EditTrips = () => {
       void preloadGoogleMap(GOOGLE_MAP_API_KEY)
     }
   }, [mapProvider])
-
-  useEffect(() => {
-    if (!isSmallScreen) {
-      setSearchMenuAnchor(null)
-    }
-  }, [isSmallScreen])
 
   const toggleDrawer = (open: boolean) => () => {
     if (open && drawerDetail.length === 0) return
@@ -807,22 +796,37 @@ const EditTrips = () => {
     }
   }
 
-  const handleSearchResultSelect = (result: SearchResult) => {
-    const pointData = buildTripPointFromSearchResult(result)
-    setSelectedPoint({
-      coord: result.location,
-      title: result.name,
-      description: result.address,
-      imageUrl: undefined,
-      actionType: 'add',
-      pointData,
-    })
+  const handleSearchResultSelect = useCallback(
+    (result: SearchResult) => {
+      const pointData = buildTripPointFromSearchResult(result)
+      setSelectedPoint({
+        coord: result.location,
+        title: result.name,
+        description: result.address,
+        imageUrl: undefined,
+        actionType: 'add',
+        pointData,
+      })
 
-  if (mapInstanceRef.current) {
-    mapInstanceRef.current.setZoomAndCenter(mapZoom, result.location)
-  }
-  setSearchMenuAnchor(null)
-}
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.setZoomAndCenter(mapZoom, result.location)
+      }
+    },
+    [mapInstanceRef],
+  )
+
+  useEffect(() => {
+    const handleExternalSearchSelect = (event: Event) => {
+      const detail = (event as CustomEvent<SearchResult>).detail
+      if (detail) {
+        handleSearchResultSelect(detail)
+      }
+    }
+    window.addEventListener('trip-search-select', handleExternalSearchSelect)
+    return () => {
+      window.removeEventListener('trip-search-select', handleExternalSearchSelect)
+    }
+  }, [handleSearchResultSelect])
 
   const handleClearSearch = useCallback(() => {
     setSearchResults([])
@@ -1387,18 +1391,6 @@ const EditTrips = () => {
     return `POI ${index + 1}`
   }
 
-  const handleSearchMenuOpen = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
-      if (!mapProvider) return
-      setSearchMenuAnchor(event.currentTarget)
-    },
-    [mapProvider],
-  )
-
-  const handleSearchMenuClose = useCallback(() => {
-    setSearchMenuAnchor(null)
-  }, [])
-
   const renderSearchField = (autoFocus = false) => (
     <Box sx={{ position: 'relative', width: '100%' }}>
       <TextField
@@ -1537,7 +1529,22 @@ const EditTrips = () => {
     setSearchResults,
     setTrip,
   ])
-  const mapProviderControl = (
+  const mapProviderControl = isSmallScreen ? (
+    <IconButton
+      color="inherit"
+      size="small"
+      onClick={handleMapProviderButtonClick}
+      disabled={!mapProvider}
+      aria-label={mapProviderButtonLabel}
+      sx={{
+        '&.Mui-disabled': {
+          color: 'rgba(255, 255, 255, 0.4)',
+        },
+      }}
+    >
+      {mapProviderButtonIcon ?? <PublicIcon fontSize="small" />}
+    </IconButton>
+  ) : (
     <Button
       variant="outlined"
       color="inherit"
@@ -1558,6 +1565,17 @@ const EditTrips = () => {
     </Button>
   )
 
+  const handleOpenSearchPage = useCallback(() => {
+    if (!mapProvider) return
+    navigate('/search', {
+      state: {
+        backgroundLocation: location,
+        from: `${location.pathname}${location.search ?? ''}` || '/edit',
+        mapProvider,
+      },
+    })
+  }, [location, mapProvider, navigate])
+
   return (
     <>
       <Box
@@ -1568,7 +1586,7 @@ const EditTrips = () => {
         backgroundColor: '#f4f6fb',
       }}
     >
-      <AppBar position="static" color="primary" elevation={2}>
+      <AppBar position="fixed" color="primary" elevation={2}>
         <Toolbar
           sx={{
             display: 'flex',
@@ -1577,14 +1595,17 @@ const EditTrips = () => {
             position: 'relative',
           }}
         >
-          <IconButton
-            edge="start"
-            color="inherit"
-            onClick={() => navigate(-1)}
-            aria-label="返回"
-          >
-            <ArrowBackIcon />
-          </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <IconButton
+              edge="start"
+              color="inherit"
+              onClick={() => navigate(-1)}
+              aria-label="返回"
+            >
+              <ArrowBackIcon />
+            </IconButton>
+            {isSmallScreen ? mapProviderControl : null}
+          </Box>
           <Typography
             variant="h6"
             component="div"
@@ -1600,31 +1621,25 @@ const EditTrips = () => {
           >
             设计
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            {mapProviderControl}
-            {isSmallScreen ? (
-              <>
-                <IconButton
-                  color="inherit"
-                  size="small"
-                  onClick={handleSearchMenuOpen}
-                  disabled={!mapProvider}
-                  aria-label="打开搜索"
-                >
-                  <SearchIcon />
-                </IconButton>
-                <Menu
-                  anchorEl={searchMenuAnchor}
-                  open={Boolean(searchMenuAnchor)}
-                  onClose={handleSearchMenuClose}
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-                  PaperProps={{ sx: { width: 260, p: 1 } }}
-                >
-                  {renderSearchField(true)}
-                </Menu>
-              </>
-            ) : (
+          <Box
+            sx={
+              isSmallScreen
+                ? {
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    marginLeft: 'auto',
+                  }
+                : {
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    ml: 'auto',
+                  }
+            }
+          >
+            {!isSmallScreen ? mapProviderControl : null}
+            {isSmallScreen ? null : (
               <Box sx={{ width: 200 }}>{renderSearchField()}</Box>
             )}
             <Button
@@ -1660,6 +1675,27 @@ const EditTrips = () => {
           </IconButton>
         </Toolbar>
       </AppBar>
+      <Toolbar />
+      {isSmallScreen ? (
+        <Fab
+          color="primary"
+          aria-label="打开搜索"
+          onClick={handleOpenSearchPage}
+          disabled={!mapProvider}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: (theme) => theme.zIndex.drawer + 2,
+            '&.Mui-disabled': {
+              backgroundColor: 'rgba(148, 163, 184, 0.6)',
+              color: '#ffffff',
+            },
+          }}
+        >
+          <SearchIcon />
+        </Fab>
+      ) : null}
       <Drawer
         anchor="right"
         open={isDrawerOpen}
@@ -1876,8 +1912,7 @@ const EditTrips = () => {
                           justifyContent: 'center',
                           gap: 1,
                           borderRadius: 3,
-                          border: '2px solid',
-                          borderColor: isPreferred ? 'primary.main' : 'transparent',
+                          border: '2px solid transparent',
                           transition: 'all 0.2s ease',
                           '&:hover': {
                             transform: 'translateY(-4px)',

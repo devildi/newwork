@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+import { getStoredUserName } from '../../utils/authStorage.ts'
 
 export type AuthMode = 'signin' | 'logon'
 
@@ -9,7 +10,7 @@ type AuthState = {
 
 const initialState: AuthState = {
   mode: 'signin',
-  userName: null,
+  userName: getStoredUserName(),
 }
 
 const authSlice = createSlice({

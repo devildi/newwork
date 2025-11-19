@@ -94,4 +94,3 @@ const createInfoWindowContent = (item: InfoWindowParams) => {
 
 export type { InfoWindowParams }
 export { createInfoWindowContent }
-

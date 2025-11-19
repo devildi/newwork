@@ -2,24 +2,26 @@ export const APP_TITLE = 'NextSticker'
 
 export const FEATURE_ITEMS = [
   '我的行程',
-  '照片录入',
-  '所有照片',
-  '瀑布流数据',
-  '编辑瀑布流',
-  '行程设计',
-  '图片预览',
-  '行程列表',
+  '我的玩具',
+  '录入',
+  '照片',
+  '编辑',
+  '瀑布流',
+  '设计',
+  '行程',
+  '图片',
 ] as const
 
 export const HOME_NAVIGATION: Record<string, string> = {
   我的行程: '/list',
-  照片录入: '/photosInput',
-  所有照片: '/photos',
-  瀑布流数据: '/waterfall',
-  行程列表: '/alltrips',
-  编辑瀑布流: '/story',
-  行程设计: '/edit',
-  图片预览: '/preview',
+  我的玩具: '/toies',
+  录入: '/photosInput',
+  照片: '/photos',
+  瀑布流: '/waterfall',
+  编辑: '/story',
+  设计: '/edit',
+  行程: '/alltrips',
+  图片: '/preview',
 }
 
 export const PREVIEW_PAGE_SIZE = 24

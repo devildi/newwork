@@ -14,10 +14,15 @@ import AppFooter from './components/AppFooter.tsx'
 import { useAppSelector } from './app/hooks.ts'
 import { useAppDispatch } from './app/hooks.ts'
 import { setUserName } from './features/auth/authSlice.ts'
+import { clearStoredUser } from './utils/authStorage.ts'
 
 function App() {
   const userName = useAppSelector((state) => state.auth.userName)
   const dispatch = useAppDispatch()
+  const handleLogout = () => {
+    clearStoredUser()
+    dispatch(setUserName(null))
+  }
 
   return (
     <>
@@ -51,7 +56,7 @@ function App() {
               <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button
                   color="inherit"
-                  onClick={() => dispatch(setUserName(null))}
+                  onClick={handleLogout}
                   sx={{
                     fontWeight: 500,
                     textTransform: 'none',

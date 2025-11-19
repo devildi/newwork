@@ -1,13 +1,19 @@
 import Alert from '@mui/material/Alert'
 import AppBar from '@mui/material/AppBar'
 import Avatar from '@mui/material/Avatar'
+import Button from '@mui/material/Button'
 import Box from '@mui/material/Box'
 import CircularProgress from '@mui/material/CircularProgress'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
 import IconButton from '@mui/material/IconButton'
 import List from '@mui/material/List'
 import ListItem from '@mui/material/ListItem'
 import ListItemAvatar from '@mui/material/ListItemAvatar'
 import ListItemText from '@mui/material/ListItemText'
+import Snackbar from '@mui/material/Snackbar'
 import SvgIcon from '@mui/material/SvgIcon'
 import Toolbar from '@mui/material/Toolbar'
 import Typography from '@mui/material/Typography'
@@ -23,6 +29,7 @@ import { ALL_TRIPS_FALLBACK_PAGE_SIZE } from '../constants/app.ts'
 
 type TripRecord = {
   _id: string
+  uid?: string
   tripName?: string
   country?: string
   city?: string
@@ -91,6 +98,13 @@ const AllTrips = () => {
   const [totalPages, setTotalPages] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [confirmingTrip, setConfirmingTrip] = useState<TripRecord | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [feedback, setFeedback] = useState<{
+    message: string
+    severity: 'success' | 'error'
+  } | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -145,7 +159,7 @@ const AllTrips = () => {
     fetchTrips()
 
     return () => controller.abort()
-  }, [currentPage])
+  }, [currentPage, reloadKey])
 
   const hasTrips = useMemo(() => trips.length > 0, [trips])
   const disablePrev = currentPage <= 1 || isLoading || !!errorMessage
@@ -165,6 +179,85 @@ const AllTrips = () => {
   }
   const handleTripClick = (trip: TripRecord) => {
     navigate('/edit', { state: { trip } })
+  }
+
+  const handleDeleteClick = (trip: TripRecord) => {
+    setConfirmingTrip(trip)
+  }
+
+  const handleCloseDialog = () => {
+    if (isDeleting) return
+    setConfirmingTrip(null)
+  }
+
+  const handleConfirmDelete = async () => {
+    const targetTrip = confirmingTrip
+    if (!targetTrip?.uid) {
+      setFeedback({
+        message: '无法删除：该行程缺少唯一标识。',
+        severity: 'error',
+      })
+      setConfirmingTrip(null)
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      const response = await fetch('/api/trip/deleteTrip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: targetTrip.uid }),
+      })
+
+      const rawText = await response.text()
+      let payload: unknown = null
+      if (rawText) {
+        try {
+          payload = JSON.parse(rawText)
+        } catch {
+          payload = rawText
+        }
+      }
+
+      if (!response.ok) {
+        const message =
+          typeof payload === 'string' && payload.trim().length > 0
+            ? payload
+            : `删除失败：${response.status}`
+        throw new Error(message)
+      }
+
+      if (!payload || typeof payload === 'string') {
+        const message =
+          typeof payload === 'string' && payload.trim().length > 0
+            ? payload
+            : '删除失败：服务返回异常数据。'
+        throw new Error(message)
+      }
+
+      setFeedback({
+        message: `已删除${
+          targetTrip.tripName ? `「${targetTrip.tripName}」` : '该行程'
+        }。`,
+        severity: 'success',
+      })
+      setConfirmingTrip(null)
+      setReloadKey((key) => key + 1)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : '删除失败，请稍后重试。'
+      setFeedback({ message, severity: 'error' })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleSnackbarClose = (
+    _?: Event | SyntheticEvent,
+    reason?: string,
+  ) => {
+    if (reason === 'clickaway') return
+    setFeedback(null)
   }
 
   const handleAvatarError = (event: SyntheticEvent<HTMLImageElement>) => {
@@ -259,6 +352,12 @@ const AllTrips = () => {
                       px: { xs: 2, md: 3 },
                       alignItems: 'flex-start',
                       gap: { xs: 2, md: 3 },
+                      position: 'relative',
+                      '& .MuiListItemSecondaryAction-root': {
+                        top: '16px',
+                        right: { xs: '16px', md: '24px' },
+                        transform: 'none',
+                      },
                     }}
                     secondaryAction={
                       trip._id ? (
@@ -266,9 +365,7 @@ const AllTrips = () => {
                           edge="end"
                           color="error"
                           aria-label="删除行程"
-                          onClick={() => {
-                            console.log('[AllTrips] 删除行程 _id:', trip._id)
-                          }}
+                          onClick={() => handleDeleteClick(trip)}
                         >
                           <DeleteOutlineIcon />
                         </IconButton>
@@ -385,6 +482,46 @@ const AllTrips = () => {
           <Alert severity="info">当前没有行程数据。</Alert>
         )}
       </Box>
+
+      <Dialog open={Boolean(confirmingTrip)} onClose={handleCloseDialog} fullWidth maxWidth="xs">
+        <DialogTitle>确认删除行程</DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Alert severity="warning">
+            删除后将无法恢复，是否删除
+            {confirmingTrip?.tripName ? `「${confirmingTrip.tripName}」` : '该行程'}？
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog} disabled={isDeleting}>
+            取消
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleConfirmDelete}
+            disabled={isDeleting}
+          >
+            {isDeleting ? '删除中…' : '删除'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={Boolean(feedback)}
+        autoHideDuration={4000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        {feedback ? (
+          <Alert
+            onClose={handleSnackbarClose}
+            severity={feedback.severity}
+            sx={{ width: '100%' }}
+          >
+            {feedback.message}
+          </Alert>
+        ) : null}
+      </Snackbar>
 
       <PageSwitcher
         sx={{

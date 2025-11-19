@@ -13,6 +13,7 @@ import { AUTH_BACKGROUND_VIDEO } from '../constants/app.ts'
 import { useAppDispatch, useAppSelector } from '../app/hooks.ts'
 import { setAuthMode, setUserName } from '../features/auth/authSlice.ts'
 import AuthErrorAlert from '../components/AuthErrorAlert.tsx'
+import { clearStoredUser, persistUser } from '../utils/authStorage.ts'
 
 const Logon = () => {
   const dispatch = useAppDispatch()
@@ -77,6 +78,7 @@ const Logon = () => {
       if (typeof payload === 'string') {
         const message = payload.trim()
         dispatch(setUserName(null))
+        clearStoredUser()
         setErrorMessage(message || '注册失败，请稍后重试。')
         return
       }
@@ -91,16 +93,19 @@ const Logon = () => {
           return trimmedName
         })()
         dispatch(setUserName(nameValue))
+        persistUser(userRecord)
         setErrorMessage(null)
         navigate('/')
         return
       }
 
       dispatch(setUserName(null))
+      clearStoredUser()
       setErrorMessage('注册失败，请稍后重试。')
     } catch (error) {
       console.error('Register request failed:', error)
       dispatch(setUserName(null))
+      clearStoredUser()
       setErrorMessage('注册请求失败，请稍后重试。')
     }
   }

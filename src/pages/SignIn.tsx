@@ -13,6 +13,7 @@ import { AUTH_BACKGROUND_VIDEO } from '../constants/app.ts'
 import { useAppDispatch, useAppSelector } from '../app/hooks.ts'
 import { setAuthMode, setUserName } from '../features/auth/authSlice.ts'
 import AuthErrorAlert from '../components/AuthErrorAlert.tsx'
+import { clearStoredUser, persistUser } from '../utils/authStorage.ts'
 
 const SignIn = () => {
   const dispatch = useAppDispatch()
@@ -75,22 +76,30 @@ const SignIn = () => {
       })()
 
       if (response.ok && hasPayload) {
-        if (payload && typeof payload === 'object' && payload !== null) {
-          const name = (payload as Record<string, unknown>).name
-          if (typeof name === 'string' && name.trim()) {
-            dispatch(setUserName(name))
-          } else {
-            dispatch(setUserName(trimmedName))
+        const resolvedName = (() => {
+          if (payload && typeof payload === 'object' && payload !== null) {
+            const name = (payload as Record<string, unknown>).name
+            if (typeof name === 'string' && name.trim()) {
+              return name.trim()
+            }
           }
-        } else if (typeof payload === 'string' && payload.trim()) {
-          dispatch(setUserName(payload.trim()))
-        } else {
-          dispatch(setUserName(trimmedName))
-        }
+          if (typeof payload === 'string' && payload.trim()) {
+            return payload.trim()
+          }
+          return trimmedName
+        })()
+
+        const userObject =
+          payload && typeof payload === 'object' && payload !== null
+            ? (payload as Record<string, unknown>)
+            : { name: resolvedName }
+        dispatch(setUserName(resolvedName))
+        persistUser(userObject)
         setErrorMessage(null)
         navigate('/')
       } else {
         dispatch(setUserName(null))
+        clearStoredUser()
         const message =
           typeof payload === 'object' && payload && 'message' in payload
             ? String((payload as Record<string, unknown>).message ?? '')
@@ -102,6 +111,7 @@ const SignIn = () => {
     } catch (error) {
       console.error('Login request failed:', error)
       dispatch(setUserName(null))
+      clearStoredUser()
       setErrorMessage('登录请求失败，请稍后重试。')
     }
   }

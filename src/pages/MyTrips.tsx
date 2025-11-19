@@ -208,7 +208,7 @@ const MyTrips = () => {
             {errorMessage}
           </Alert>
         ) : hasTrips ? (
-          <Stack spacing={3} sx={{ width: '100%', maxWidth: 880 }}>
+          <Stack spacing={3} sx={{ width: '100%', maxWidth: 880}}>
             {trips.map((trip) => {
               const cover = extractFirstPoiImage(trip.detail)
               const subtitle = buildTripSubtitle(trip)
