@@ -66,7 +66,7 @@ import { CSS } from '@dnd-kit/utilities'
 import GaodeMap from '../components/GaodeMap.tsx'
 import GoogleMap from '../components/GoogleMap.tsx'
 import { preloadGoogleMap } from '../utils/googleMapsLoader.ts'
-import type { SearchResult } from '../components/GaodeMap.tsx'
+import type { SearchResult } from '../types/search.ts'
 import { preloadGaodeMap } from '../utils/amapLoader.ts'
 import { useAppSelector } from '../app/hooks.ts'
 import { GAODE_MAP_API_KEY, GOOGLE_MAP_API_KEY } from '../constants/map.ts'
@@ -775,9 +775,9 @@ const EditTrips = () => {
             return
           }
           const list: SearchResult[] = results
-            .filter((place) => place.geometry?.location)
+            .filter((place: any) => place.geometry?.location)
             .slice(0, 5)
-            .map((place) => {
+            .map((place: any) => {
               const location = place.geometry!.location
               return {
                 name: place.name ?? '未知地点',
@@ -882,11 +882,12 @@ const EditTrips = () => {
       }
 
       if (newIndices && createdPoint) {
+        const indices: { dayIndex: number; pointIndex: number } = newIndices
         setSelectedPoint({
           ...point,
           actionType: 'delete',
-          dayIndex: newIndices.dayIndex,
-          pointIndex: newIndices.pointIndex,
+          dayIndex: indices.dayIndex,
+          pointIndex: indices.pointIndex,
           pointData: createdPoint,
         })
       }
@@ -2091,7 +2092,7 @@ const EditTrips = () => {
             <Box sx={{ display: 'flex', gap: 1 }}>
               {infoDialogFields
                 .filter((field) => field.name === 'longitude' || field.name === 'latitude')
-                .map((field, index) => {
+                .map((field) => {
                   const originalIndex = infoDialogFields.findIndex((item) => item.name === field.name)
                   return (
                     <TextField

@@ -167,7 +167,7 @@ const PhotosInput = () => {
           throw new Error(`请求失败：${response.status}`)
         }
 
-        const data = await response.json()
+        await response.json()
         const successMessage = isEditing ? '更新成功。' : '提交成功。'
 
         setFeedback({

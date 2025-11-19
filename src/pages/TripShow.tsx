@@ -121,18 +121,27 @@ const buildTransferLinks = (
   return { scheme }
 }
 
-const openTransferApp = (coord: [number, number], title: string, isDomestic: boolean) => {
+const openTransferApp = (
+  coord: [number, number],
+  title: string,
+  isDomestic: boolean,
+  handleUnavailable: () => void,
+) => {
   const { scheme } = buildTransferLinks(coord, title, isDomestic)
   const isMobile = /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent)
 
   if (!isMobile) {
-    setSnackbar({ open: true, message: '请在手机端使用地图导航功能。' })
+    handleUnavailable()
     return
   }
   window.location.href = scheme
 }
 
-const resolveMarker = (point: TripDetailPoint, isDomestic: boolean): MapMarker | null => {
+const resolveMarker = (
+  point: TripDetailPoint,
+  isDomestic: boolean,
+  handleUnavailable: () => void,
+): MapMarker | null => {
   const coord = extractCoordFromPoint(point)
   if (!coord) return null
   const title =
@@ -152,7 +161,7 @@ const resolveMarker = (point: TripDetailPoint, isDomestic: boolean): MapMarker |
     title,
     description,
     imageUrl: image,
-    onInfoWindowClick: () => openTransferApp(coord, title ?? '目的地', isDomestic),
+    onInfoWindowClick: () => openTransferApp(coord, title ?? '目的地', isDomestic, handleUnavailable),
   }
 }
 
@@ -187,7 +196,9 @@ const TripShow = () => {
     }
     const firstDay = normalizedDetail[0]
     if (firstDay && firstDay.length > 0) {
-      const marker = resolveMarker(firstDay[0], isDomesticTrip)
+      const marker = resolveMarker(firstDay[0], isDomesticTrip, () =>
+        setSnackbar({ open: true, message: '请在手机端使用地图导航功能。' }),
+      )
       if (marker) {
         setActiveMarker(marker)
       }
@@ -209,7 +220,9 @@ const TripShow = () => {
     setExpandedDay(dayIndex)
     const dayPoints = normalizedDetail[dayIndex]
     if (dayPoints && dayPoints.length > 0) {
-      const marker = resolveMarker(dayPoints[0], isDomesticTrip)
+      const marker = resolveMarker(dayPoints[0], isDomesticTrip, () =>
+        setSnackbar({ open: true, message: '请在手机端使用地图导航功能。' }),
+      )
       if (marker) {
         setActiveMarker(marker)
         if (mapInstanceRef.current) {
@@ -220,7 +233,9 @@ const TripShow = () => {
   }
 
   const handlePoiClick = (point: TripDetailPoint) => () => {
-    const marker = resolveMarker(point, isDomesticTrip)
+    const marker = resolveMarker(point, isDomesticTrip, () =>
+      setSnackbar({ open: true, message: '请在手机端使用地图导航功能。' }),
+    )
     if (!marker) {
       setSnackbar({ open: true, message: '该点位缺少坐标信息，无法定位。' })
       return

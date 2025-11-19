@@ -12,7 +12,7 @@ import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type SyntheticEvent } from 'react'
 
 type LocationState = {
   title?: string
@@ -161,9 +161,8 @@ const Toy = () => {
           <Box
             component="img"
             src={coverSrc}
-            onError={(e) => {
-              // @ts-expect-error: target is HTMLImageElement
-              e.currentTarget.src = fallbackCover
+            onError={(event: SyntheticEvent<HTMLImageElement>) => {
+              event.currentTarget.src = fallbackCover
             }}
             alt={displayTitle}
             sx={{

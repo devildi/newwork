@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react'
 import Box from '@mui/material/Box'
 import ButtonBase from '@mui/material/ButtonBase'
 import Grid from '@mui/material/Grid'
@@ -35,7 +36,7 @@ const Home = () => {
       ),
     )
 
-  const cards = [] as JSX.Element[]
+  const cards: ReactElement[] = []
 
   for (let i = 0; i < FEATURE_ITEMS.length; ) {
     const mergedGroup = findMergedGroup(i)

@@ -24,6 +24,7 @@ type ToyStory = {
   price?: number
   createAt?: string
   sellAt?: string
+  articleURL?: string
 }
 
 const mapStory = (raw: unknown): ToyStory => {
@@ -44,6 +45,7 @@ const mapStory = (raw: unknown): ToyStory => {
     price: source.price as number | undefined,
     createAt: source.createAt as string | undefined,
     sellAt: source.sellAt as string | undefined,
+    articleURL: source.articleURL as string | undefined,
   }
 }
 

@@ -52,9 +52,7 @@ const AddToy = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
-  const [uploadedKey, setUploadedKey] = useState<string | null>(null)
   const [uploadedDimensions, setUploadedDimensions] = useState<{ width?: number; height?: number } | null>(null)
   const [localImageDimensions, setLocalImageDimensions] = useState<{ width?: number; height?: number } | null>(null)
   const [toyName, setToyName] = useState('')
@@ -115,14 +113,13 @@ const AddToy = () => {
 
       const contentType = tokenResponse.headers.get('content-type')?.toLowerCase()
       const tokenPayloadText = await tokenResponse.text()
-      let tokenData:
-        | string
-        | {
-            token?: string
-            uptoken?: string
-            key?: string
-            domain?: string
-          } = tokenPayloadText
+      type TokenPayload = {
+        token?: string
+        uptoken?: string
+        key?: string
+        domain?: string
+      }
+      let tokenData: string | TokenPayload = tokenPayloadText
       if (contentType?.includes('application/json')) {
         try {
           tokenData = JSON.parse(tokenPayloadText)
@@ -133,8 +130,9 @@ const AddToy = () => {
 
       console.log('上传凭证：', tokenData)
 
+      const tokenObject = typeof tokenData === 'string' ? undefined : tokenData
       const uploadToken =
-        typeof tokenData === 'string' ? tokenData : tokenData.token || tokenData.uptoken
+        typeof tokenData === 'string' ? tokenData : tokenObject?.token || tokenObject?.uptoken
       console.log('上传Token：', uploadToken)
       if (!uploadToken) {
         throw new Error('未获取到上传凭证')
@@ -153,8 +151,7 @@ const AddToy = () => {
       console.log('图片压缩后尺寸：', compressed?.width, compressed?.height)
       setUploadedDimensions({ width: compressed?.width, height: compressed?.height })
 
-      const uploadKey =
-        tokenData.key || `toy-${Date.now()}-${selectedFile.name}`
+      const uploadKey = tokenObject?.key || `toy-${Date.now()}-${selectedFile.name}`
       const observable = qiniu.upload(
         fileToUpload,
         uploadKey,
@@ -195,12 +192,6 @@ const AddToy = () => {
       console.log('七牛上传结果：', uploadResult)
 
       const finalKey = uploadResult.key || uploadKey
-      setUploadedKey(finalKey)
-      const normalizedDomain = tokenData.domain?.replace(/\/$/, '') || ''
-      const finalUrl = normalizedDomain
-        ? `${normalizedDomain}/${finalKey}`
-        : finalKey
-      setUploadedImageUrl(finalUrl)
 
       const numericPrice = (() => {
         const num = Number(price)
@@ -330,7 +321,6 @@ const AddToy = () => {
                 const url = URL.createObjectURL(file)
                 setPreviewUrl(url)
                 setSelectedFile(file)
-                setUploadedImageUrl(null)
                 setUploadProgress(null)
                 setLocalImageDimensions(null)
 
@@ -346,7 +336,6 @@ const AddToy = () => {
               } else {
                 setPreviewUrl(null)
                 setSelectedFile(null)
-                setUploadedImageUrl(null)
                 setUploadProgress(null)
                 setLocalImageDimensions(null)
               }

@@ -520,7 +520,7 @@ const AllTrips = () => {
           >
             {feedback.message}
           </Alert>
-        ) : null}
+        ) : undefined}
       </Snackbar>
 
       <PageSwitcher

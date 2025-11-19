@@ -73,7 +73,6 @@ const GoogleMap = ({
           setIsLoading(false)
           return
         }
-        const google = window.google
         let MapCtor: any | null = null
         if (typeof maps.importLibrary === 'function') {
           try {
@@ -153,8 +152,7 @@ const GoogleMap = ({
 
   useEffect(() => {
     if (!isMapInitialized || !mapInstance.current) return undefined
-    const google = window.google
-    if (!google?.maps) return undefined
+    if (!window.google?.maps) return undefined
 
     infoWindowsRef.current.forEach((window) => window.close())
     infoWindowsRef.current = []

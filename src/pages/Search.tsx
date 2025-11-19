@@ -17,7 +17,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
 
-import type { SearchResult } from '../components/GaodeMap.tsx'
+import type { SearchResult } from '../types/search.ts'
 import { preloadGaodeMap } from '../utils/amapLoader.ts'
 import { preloadGoogleMap } from '../utils/googleMapsLoader.ts'
 import { GAODE_MAP_API_KEY, GOOGLE_MAP_API_KEY } from '../constants/map.ts'
@@ -105,8 +105,14 @@ const SearchPage = () => {
           setIsSearching(false)
         })
       } else if (mapProvider === 'google') {
+        const googleMaps = await preloadGoogleMap(GOOGLE_MAP_API_KEY)
+        if (!googleMaps?.maps?.importLibrary) {
+          setSearchResults([])
+          setIsSearching(false)
+          return
+        }
         const { PlacesService, PlacesServiceStatus } =
-          (await google.maps.importLibrary('places')) as { PlacesService: any; PlacesServiceStatus: any }
+          (await googleMaps.maps.importLibrary('places')) as { PlacesService: any; PlacesServiceStatus: any }
         const placesService = new PlacesService(document.createElement('div'))
         placesService.textSearch({ query: keyword }, (results: any, status: string) => {
           if (status !== PlacesServiceStatus.OK || !results) {
