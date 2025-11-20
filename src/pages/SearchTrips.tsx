@@ -13,41 +13,18 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
 
-import { getStoredUser } from '../utils/authStorage.ts'
-
-type SearchResult = {
+type TripResult = {
+  _id?: string
   id?: string
-  toyName?: string
-  toyPicUrl?: string
+  tripName?: string | null
+  country?: string | null
+  city?: string | null
+  tags?: string | null
+  detail?: unknown
+  coverUrl?: string | null
 }
 
-const resolveOwnerId = (user: unknown): string | null => {
-  if (!user || typeof user !== 'object') return null
-  const direct =
-    (user as { _id?: string })._id ||
-    (user as { id?: string }).id ||
-    (user as { userId?: string }).userId
-  if (typeof direct === 'string' && direct.trim()) return direct.trim()
-
-  const nestedSources = [
-    (user as { user?: { _id?: string; id?: string; userId?: string } }).user,
-    (user as { data?: { _id?: string; id?: string; userId?: string } }).data,
-    (user as { result?: { _id?: string; id?: string; userId?: string } }).result,
-  ]
-  for (const nested of nestedSources) {
-    if (!nested || typeof nested !== 'object') continue
-    const nestedId =
-      (nested as { _id?: string })._id ||
-      (nested as { id?: string }).id ||
-      (nested as { userId?: string }).userId
-    if (typeof nestedId === 'string' && nestedId.trim()) {
-      return nestedId.trim()
-    }
-  }
-  return null
-}
-
-const normalizeResults = (payload: unknown): SearchResult[] => {
+const normalizeTripResults = (payload: unknown): TripResult[] => {
   const pickList = (): unknown[] => {
     if (Array.isArray(payload)) return payload
     if (payload && typeof payload === 'object') {
@@ -57,40 +34,73 @@ const normalizeResults = (payload: unknown): SearchResult[] => {
     }
     return []
   }
+
+  const extractCover = (detail: unknown): string | null => {
+    if (!Array.isArray(detail)) return null
+    for (const day of detail) {
+      if (!Array.isArray(day)) continue
+      for (const point of day) {
+        if (!point || typeof point !== 'object') continue
+        const pic =
+          (point as { picURL?: string }).picURL ||
+          (point as { pic?: string }).pic
+        if (typeof pic === 'string' && pic.trim()) return pic.trim()
+      }
+    }
+    return null
+  }
+
   return pickList()
     .map((item) => {
       if (!item || typeof item !== 'object') return {}
       const source = item as Record<string, unknown>
       return {
-        id: (source._id as string | undefined) || (source.id as string | undefined),
-        toyName: (source.toyName as string | undefined) || (source.name as string | undefined),
-        toyPicUrl:
-          (source.toyPicUrl as string | undefined) ||
-          (source.picURL as string | undefined) ||
-          (source.photo as string | undefined),
+        _id: (source._id as string | undefined) || (source.id as string | undefined),
+        id: (source.id as string | undefined) || (source._id as string | undefined),
+        tripName:
+          (source.tripName as string | null | undefined) ||
+          (source.name as string | null | undefined),
+        country: source.country as string | null | undefined,
+        city: source.city as string | null | undefined,
+        tags: source.tags as string | null | undefined,
+        detail: source.detail,
+        coverUrl:
+          (source.coverUrl as string | null | undefined) ||
+          (source.cover as string | null | undefined) ||
+          extractCover(source.detail ?? null),
       }
     })
-    .filter((item) => item.toyName || item.toyPicUrl || item.id)
+    .filter((item) => item.tripName || item._id || item.id)
 }
 
-const SearchPage = () => {
+const buildSubtitle = (trip: TripResult) => {
+  const location = [trip.country, trip.city]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean)
+    .join(' · ')
+  const tagLabel =
+    typeof trip.tags === 'string' && trip.tags.trim().length > 0
+      ? trip.tags.trim()
+      : ''
+
+  return [location, tagLabel].filter(Boolean).join(' ｜ ')
+}
+
+const SearchTrips = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const state = (location.state ?? {}) as {
-    from?: string
-    backgroundLocation?: Location
-  }
-  const storedUserId = useMemo(() => resolveOwnerId(getStoredUser()), [])
+  const state = (location.state ?? {}) as { from?: string; backgroundLocation?: Location }
   const cameFromOverlay = Boolean(state.backgroundLocation)
+
   const [searchValue, setSearchValue] = useState('')
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [searchResults, setSearchResults] = useState<TripResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const fallbackPath = useMemo(() => {
     if (typeof state.from === 'string' && state.from.length > 0) return state.from
-    return '/toies'
+    return '/list'
   }, [state.from])
 
   const exitSearch = useCallback(() => {
@@ -98,12 +108,10 @@ const SearchPage = () => {
     const canGoBack = historyIndex > 0
     if (cameFromOverlay) {
       navigate(-1)
+    } else if (canGoBack) {
+      navigate(-1)
     } else {
-      if (canGoBack) {
-        navigate(-1)
-      } else {
-        navigate(fallbackPath, { replace: true })
-      }
+      navigate(fallbackPath, { replace: true })
     }
   }, [cameFromOverlay, fallbackPath, navigate])
 
@@ -112,10 +120,7 @@ const SearchPage = () => {
       inputRef.current?.focus({ preventScroll: true })
       inputRef.current?.select()
     }
-    const timers = [
-      window.setTimeout(focusInput, 80),
-      window.setTimeout(focusInput, 240),
-    ]
+    const timers = [window.setTimeout(focusInput, 80), window.setTimeout(focusInput, 240)]
     return () => timers.forEach((t) => window.clearTimeout(t))
   }, [])
 
@@ -131,37 +136,36 @@ const SearchPage = () => {
     setIsSearching(true)
     setHasSearched(true)
     try {
-      const uidParam = storedUserId ? `&uid=${encodeURIComponent(storedUserId)}` : ''
       const response = await fetch(
-        `/api/treasure/search?keyword=${encodeURIComponent(keyword)}${uidParam}`,
-        {
-          method: 'GET',
-        },
+        `/api/trip/getDescriptedTrip?description=${encodeURIComponent(keyword)}`,
+        { method: 'GET' },
       )
       if (!response.ok) {
         throw new Error(`搜索失败：${response.status}`)
       }
       const payload = await response.json()
-      const normalized = normalizeResults(payload)
+      const normalized = normalizeTripResults(payload)
       setSearchResults(normalized)
     } catch (error) {
-      console.error('搜索失败：', error)
+      console.error('搜索行程失败：', error)
       setSearchResults([])
     } finally {
       setIsSearching(false)
     }
-  }, [searchValue, storedUserId])
+  }, [searchValue])
 
   const handleResultSelect = useCallback(
-    (result: SearchResult) => {
-      const title = result.toyName || '玩具'
-      navigate('/toy', {
-        state: {
-          title,
-          picURL: result.toyPicUrl,
-          id: result.id,
-          item: result,
-        },
+    (trip: TripResult) => {
+      const mergedTrip = {
+        _id: trip._id || trip.id || '',
+        tripName: trip.tripName,
+        country: trip.country,
+        city: trip.city,
+        tags: trip.tags,
+        detail: trip.detail,
+      }
+      navigate('/show', {
+        state: { trip: mergedTrip },
       })
     },
     [navigate],
@@ -211,7 +215,7 @@ const SearchPage = () => {
               exitSearch()
             }
           }}
-          placeholder="请输入关键字"
+          placeholder="输入行程描述"
           autoFocus
           variant="outlined"
           fullWidth
@@ -259,11 +263,11 @@ const SearchPage = () => {
             </Box>
           ) : searchResults.length > 0 ? (
             <List>
-              {searchResults.map((result, index) => (
+              {searchResults.map((trip, index) => (
                 <ListItemButton
-                  key={`${result.id || result.toyName || 'item'}-${index}`}
-                  onClick={() => handleResultSelect(result)}
-                  sx={{ gap: 1.5 }}
+                  key={`${trip._id || trip.id || 'trip'}-${index}`}
+                  onClick={() => handleResultSelect(trip)}
+                  sx={{ gap: 1.5, alignItems: 'flex-start' }}
                 >
                   <Box
                     sx={{
@@ -279,12 +283,12 @@ const SearchPage = () => {
                       flexShrink: 0,
                     }}
                   >
-                    {result.toyPicUrl ? (
+                    {trip.coverUrl ? (
                       <Box
                         component="img"
-                        src={result.toyPicUrl}
-                        alt={result.toyName || '玩具'}
-                        sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                        src={trip.coverUrl}
+                        alt={trip.tripName || '行程'}
+                        sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'cover' }}
                         loading="lazy"
                       />
                     ) : (
@@ -292,16 +296,17 @@ const SearchPage = () => {
                     )}
                   </Box>
                   <ListItemText
-                    primary={result.toyName || '未命名玩具'}
+                    primary={trip.tripName?.trim() || '未命名行程'}
+                    secondary={buildSubtitle(trip)}
                     primaryTypographyProps={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}
-                    secondaryTypographyProps={{ display: 'none' }}
+                    secondaryTypographyProps={{ fontSize: 13, color: '#6b7280', mt: 0.25 }}
                   />
                 </ListItemButton>
               ))}
             </List>
           ) : hasSearched ? (
             <Box sx={{ py: 4, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
-              暂无搜索结果
+              未找到相关行程
             </Box>
           ) : null}
         </Paper>
@@ -323,4 +328,4 @@ const SearchPage = () => {
   )
 }
 
-export default SearchPage
+export default SearchTrips

@@ -24,6 +24,7 @@ import { store } from './app/store.ts'
 import { preloadGaodeMap } from './utils/amapLoader.ts'
 import Search from './pages/Search.tsx'
 import AddToy from './pages/AddToy.tsx'
+import SearchTrips from './pages/SearchTrips.tsx'
 
 preloadGaodeMap('fbe59813637de60223e3d22805a2486c')
 
@@ -45,6 +46,7 @@ const AppRoutes = () => {
           <Route path="/alltrips" element={<AllTrips />} />
           <Route path="/list" element={<MyTrips />} />
           <Route path="/show" element={<TripShow />} />
+          <Route path="/searchTrips" element={<SearchTrips />} />
           <Route path="/edit" element={<EditTrips />} />
           <Route path="/toies" element={<Toies />} />
           <Route path="/toy" element={<Toy />} />

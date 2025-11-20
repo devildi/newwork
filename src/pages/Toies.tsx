@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AppBar from '@mui/material/AppBar'
 import Toolbar from '@mui/material/Toolbar'
 import IconButton from '@mui/material/IconButton'
@@ -11,6 +11,8 @@ import Alert from '@mui/material/Alert'
 import AddIcon from '@mui/icons-material/Add'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import SearchIcon from '@mui/icons-material/Search'
+import { getStoredUser } from '../utils/authStorage.ts'
 
 type ToyStory = {
   _id?: string
@@ -25,6 +27,32 @@ type ToyStory = {
   createAt?: string
   sellAt?: string
   articleURL?: string
+}
+
+const resolveOwnerId = (user: unknown): string | null => {
+  if (!user || typeof user !== 'object') return null
+  const direct =
+    (user as { _id?: string })._id ||
+    (user as { id?: string }).id ||
+    (user as { userId?: string }).userId
+  if (typeof direct === 'string' && direct.trim()) return direct.trim()
+
+  const nestedSources = [
+    (user as { user?: { _id?: string; id?: string; userId?: string } }).user,
+    (user as { data?: { _id?: string; id?: string; userId?: string } }).data,
+    (user as { result?: { _id?: string; id?: string; userId?: string } }).result,
+  ]
+  for (const nested of nestedSources) {
+    if (!nested || typeof nested !== 'object') continue
+    const nestedId =
+      (nested as { _id?: string })._id ||
+      (nested as { id?: string }).id ||
+      (nested as { userId?: string }).userId
+    if (typeof nestedId === 'string' && nestedId.trim()) {
+      return nestedId.trim()
+    }
+  }
+  return null
 }
 
 const mapStory = (raw: unknown): ToyStory => {
@@ -72,6 +100,7 @@ const normalizeStories = (payload: unknown): ToyStory[] => {
 }
 
 const Toies = () => {
+  const storedUserId = useMemo(() => resolveOwnerId(getStoredUser()), [])
   const navigate = useNavigate()
   const [stories, setStories] = useState<ToyStory[]>([])
   const [page, setPage] = useState(1)
@@ -91,64 +120,65 @@ const Toies = () => {
     isInitialLoading: true,
   })
 
-  const fetchStories = useCallback(async (pageToLoad: number, controller: AbortController) => {
-    const isFirstPage = pageToLoad === 1
+  const fetchStories = useCallback(
+    async (pageToLoad: number, controller: AbortController) => {
+      const isFirstPage = pageToLoad === 1
+      const uidParam = storedUserId ? `&uid=${encodeURIComponent(storedUserId)}` : ''
 
-    if (isFirstPage) {
-      setIsInitialLoading(true)
-      setErrorMessage(null)
-      setLoadMoreError(null)
-    } else {
-      setIsFetchingMore(true)
-      setLoadMoreError(null)
-    }
-    isLoadingPageRef.current = true
-
-    try {
-      const response = await fetch(
-        `/api/treasure/getAllTreasures?page=${pageToLoad}`,
-        {
-          signal: controller.signal,
-        },
-      )
-
-      if (!response.ok) {
-        throw new Error(`请求失败：${response.status}`)
-      }
-
-      const payload = await response.json()
-      const incoming = normalizeStories(payload)
-
-      setStories((prev) => {
-        if (incoming.length <= prev.length) {
-          setHasMore(false)
-          return prev
-        }
-        const appended = incoming.slice(prev.length)
-        setHasMore(appended.length > 0)
-        return appended.length ? [...prev, ...appended] : prev
-      })
       if (isFirstPage) {
-        setIsInitialLoading(false)
-      }
-    } catch (error) {
-      if ((error as Error).name === 'AbortError') return
-      console.error('获取玩具数据失败：', error)
-      if (isFirstPage) {
-        setErrorMessage('加载玩具数据失败，请稍后再试。')
-        setStories([])
-        setHasMore(false)
-        setIsInitialLoading(false)
+        setIsInitialLoading(true)
+        setErrorMessage(null)
+        setLoadMoreError(null)
       } else {
-        setLoadMoreError('加载更多玩具失败，请稍后再试。')
+        setIsFetchingMore(true)
+        setLoadMoreError(null)
       }
-    } finally {
-      if (!isFirstPage) {
-        setIsFetchingMore(false)
+      isLoadingPageRef.current = true
+
+      try {
+        const response = await fetch(`/api/treasure/getAllTreasures?page=${pageToLoad}${uidParam}`, {
+          signal: controller.signal,
+        })
+
+        if (!response.ok) {
+          throw new Error(`请求失败：${response.status}`)
+        }
+
+        const payload = await response.json()
+        const incoming = normalizeStories(payload)
+
+        setStories((prev) => {
+          if (incoming.length <= prev.length) {
+            setHasMore(false)
+            return prev
+          }
+          const appended = incoming.slice(prev.length)
+          setHasMore(appended.length > 0)
+          return appended.length ? [...prev, ...appended] : prev
+        })
+        if (isFirstPage) {
+          setIsInitialLoading(false)
+        }
+      } catch (error) {
+        if ((error as Error).name === 'AbortError') return
+        console.error('获取玩具数据失败：', error)
+        if (isFirstPage) {
+          setErrorMessage('加载玩具数据失败，请稍后再试。')
+          setStories([])
+          setHasMore(false)
+          setIsInitialLoading(false)
+        } else {
+          setLoadMoreError('加载更多玩具失败，请稍后再试。')
+        }
+      } finally {
+        if (!isFirstPage) {
+          setIsFetchingMore(false)
+        }
+        isLoadingPageRef.current = false
       }
-      isLoadingPageRef.current = false
-    }
-  }, [])
+    },
+    [storedUserId],
+  )
 
   useEffect(() => {
     const controller = new AbortController()
@@ -285,6 +315,15 @@ const Toies = () => {
           >
             我的玩具
           </Typography>
+          <IconButton
+            edge="end"
+            color="inherit"
+            aria-label="搜索"
+            onClick={() => navigate('/search', { state: { from: '/toies' } })}
+            sx={{ ml: 'auto' }}
+          >
+            <SearchIcon />
+          </IconButton>
         </Toolbar>
       </AppBar>
 

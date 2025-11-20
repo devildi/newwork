@@ -7,6 +7,7 @@ import Stack from '@mui/material/Stack'
 import Toolbar from '@mui/material/Toolbar'
 import Typography from '@mui/material/Typography'
 import SvgIcon from '@mui/material/SvgIcon'
+import SearchIcon from '@mui/icons-material/Search'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -187,7 +188,14 @@ const MyTrips = () => {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, textAlign: 'center' }}>
             我的行程
           </Typography>
-          <Box sx={{ width: 48, height: 48 }} />
+          <IconButton
+            edge="end"
+            color="inherit"
+            aria-label="搜索行程"
+            onClick={() => navigate('/searchTrips', { state: { from: '/list' } })}
+          >
+            <SearchIcon />
+          </IconButton>
         </Toolbar>
       </AppBar>
       <Toolbar />

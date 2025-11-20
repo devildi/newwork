@@ -39,10 +39,7 @@ const Toy = () => {
   const coverSrc =
     picURL ||
     'https://images.unsplash.com/photo-1592188657297-5c4b90c4b716?auto=format&fit=crop&w=1600&q=80'
-  const ratioPercent =
-    typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0
-      ? (height / width) * 100
-      : 56.25
+  const hasDimensions = typeof width === 'number' && typeof height === 'number' && width > 0 && height > 0
   const formatDate = (dateString?: string) => {
     if (!dateString) return null
     const date = new Date(dateString)
@@ -155,7 +152,11 @@ const Toy = () => {
             width: '100%',
             backgroundColor: '#f8fafc',
             overflow: 'hidden',
-            pt: `${ratioPercent}%`,
+            ...(hasDimensions
+              ? {
+                  aspectRatio: `${width}/${height}`,
+                }
+              : {}),
           }}
         >
           <Box
@@ -165,13 +166,25 @@ const Toy = () => {
               event.currentTarget.src = fallbackCover
             }}
             alt={displayTitle}
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
+            sx={
+              hasDimensions
+                ? {
+                    position: 'absolute',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }
+                : {
+                    position: 'relative',
+                    width: '100%',
+                    height: 'auto',
+                    maxHeight: '80vh',
+                    display: 'block',
+                    objectFit: 'contain',
+                    mx: 'auto',
+                  }
+            }
           />
         </Box>
         <Box sx={{ p: 3 }}>
