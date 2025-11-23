@@ -609,18 +609,22 @@ const Preview = () => {
                       },
                     }}
                   />
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      gap: 1,
-                      '& .MuiButton-root': {
-                        height: 40,
-                        minWidth: 96,
-                        whiteSpace: 'nowrap',
-                        px: 2,
-                      },
-                    }}
-                  >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: { xs: 1.5, sm: 1 },
+                    width: { xs: '100%', sm: 'auto' },
+                    justifyContent: { xs: 'space-between', sm: 'flex-start' },
+                    alignItems: 'center',
+                    '& .MuiButton-root': {
+                      height: 40,
+                      minWidth: 96,
+                      whiteSpace: 'nowrap',
+                      px: 2,
+                      flex: { xs: '1 1 0', sm: '0 0 auto' },
+                    },
+                  }}
+                >
                     <Button
                       variant="contained"
                       onClick={handleSaveUrl}

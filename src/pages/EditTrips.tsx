@@ -2033,18 +2033,37 @@ const EditTrips = () => {
         <DialogTitle
           sx={{
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            pr: 1,
-            gap: 2,
+            flexDirection: isSmallScreen ? 'column' : 'row',
+            alignItems: isSmallScreen ? 'flex-start' : 'center',
+            justifyContent: isSmallScreen ? 'flex-start' : 'space-between',
+            px: 3,
+            gap: isSmallScreen ? 1.5 : 2,
           }}
         >
           点位详情
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: isSmallScreen ? 'column' : 'row',
+              alignItems: isSmallScreen ? 'center' : 'center',
+              gap: isSmallScreen ? 1 : 1,
+              width: isSmallScreen ? '100%' : 'auto',
+              flexWrap: isSmallScreen ? 'nowrap' : 'nowrap',
+              justifyContent: isSmallScreen ? 'center' : 'flex-end',
+            }}
+          >
             <Button
               variant="outlined"
               size="small"
-              sx={{ whiteSpace: 'nowrap', minWidth: 96, display: 'flex', justifyContent: 'center' }}
+              sx={{
+                whiteSpace: 'nowrap',
+                minWidth: 96,
+                display: 'flex',
+                justifyContent: 'center',
+                flex: isSmallScreen ? undefined : '0 0 auto',
+                width: isSmallScreen ? '100%' : undefined,
+              }}
+              fullWidth={isSmallScreen}
               onClick={handleFetchSpotDescription}
               disabled={isFetchingDescription}
             >
@@ -2057,7 +2076,15 @@ const EditTrips = () => {
             <Button
               variant="outlined"
               size="small"
-              sx={{ whiteSpace: 'nowrap', minWidth: 96, display: 'flex', justifyContent: 'center' }}
+              sx={{
+                whiteSpace: 'nowrap',
+                minWidth: 96,
+                display: 'flex',
+                justifyContent: 'center',
+                flex: isSmallScreen ? undefined : '0 0 auto',
+                width: isSmallScreen ? '100%' : undefined,
+              }}
+              fullWidth={isSmallScreen}
               onClick={handleFetchImageLink}
               disabled={isFetchingImage}
             >
@@ -2070,7 +2097,12 @@ const EditTrips = () => {
             <Button
               variant="contained"
               size="small"
-              sx={{ fontWeight: 600 }}
+              sx={{
+                fontWeight: 600,
+                flex: isSmallScreen ? undefined : '0 0 auto',
+                width: isSmallScreen ? '100%' : undefined,
+              }}
+              fullWidth={isSmallScreen}
               onClick={handleInfoDialogSave}
             >
               保存修改
