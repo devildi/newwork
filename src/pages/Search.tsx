@@ -14,8 +14,12 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import type { Location } from 'react-router-dom'
 
 import { getStoredUser } from '../utils/authStorage.ts'
+import { preloadGaodeMap } from '../utils/amapLoader.ts'
+import { preloadGoogleMap } from '../utils/googleMapsLoader.ts'
+import { GAODE_MAP_API_KEY, GOOGLE_MAP_API_KEY } from '../constants/map.ts'
+import type { SearchResult as POISearchResult } from '../types/search.ts'
 
-type SearchResult = {
+type ToySearchResult = {
   id?: string
   toyName?: string
   toyPicUrl?: string
@@ -47,7 +51,7 @@ const resolveOwnerId = (user: unknown): string | null => {
   return null
 }
 
-const normalizeResults = (payload: unknown): SearchResult[] => {
+const normalizeResults = (payload: unknown): ToySearchResult[] => {
   const pickList = (): unknown[] => {
     if (Array.isArray(payload)) return payload
     if (payload && typeof payload === 'object') {
@@ -79,11 +83,15 @@ const SearchPage = () => {
   const state = (location.state ?? {}) as {
     from?: string
     backgroundLocation?: Location
+    mapProvider?: 'gaode' | 'google'
   }
   const storedUserId = useMemo(() => resolveOwnerId(getStoredUser()), [])
   const cameFromOverlay = Boolean(state.backgroundLocation)
+  const mapProvider = state.mapProvider
+  const isPOISearch = Boolean(mapProvider)
   const [searchValue, setSearchValue] = useState('')
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [toySearchResults, setToySearchResults] = useState<ToySearchResult[]>([])
+  const [poiSearchResults, setPOISearchResults] = useState<POISearchResult[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -123,13 +131,95 @@ const SearchPage = () => {
     const keyword = searchValue.trim()
     inputRef.current?.blur()
     if (!keyword) {
-      setSearchResults([])
+      setToySearchResults([])
+      setPOISearchResults([])
       setIsSearching(false)
       setHasSearched(false)
       return
     }
     setIsSearching(true)
     setHasSearched(true)
+
+    // POI Search (from /edit page)
+    if (isPOISearch && mapProvider) {
+      try {
+        setPOISearchResults([])
+        if (mapProvider === 'gaode') {
+          const AMap = await preloadGaodeMap(GAODE_MAP_API_KEY)
+          const placeSearch = new AMap.PlaceSearch({ city: '全国', pageSize: 5 })
+          placeSearch.search(keyword, (status: string, result: any) => {
+            if (status !== 'complete' || !result?.poiList?.pois) {
+              setPOISearchResults([])
+              setIsSearching(false)
+              return
+            }
+            const list: POISearchResult[] = result.poiList.pois
+              .slice(0, 5)
+              .map((poi: any) => {
+                const location = poi.location
+                let lngLat: [number, number] | null = null
+                if (location) {
+                  if (typeof location.lng === 'number' && typeof location.lat === 'number') {
+                    lngLat = [location.lng, location.lat]
+                  } else if (typeof location === 'string') {
+                    const [lng, lat] = location.split(/[,，]/).map(Number)
+                    if (Number.isFinite(lng) && Number.isFinite(lat)) {
+                      lngLat = [lng, lat]
+                    }
+                  }
+                }
+                if (!lngLat) return null
+                return {
+                  name: poi.name,
+                  location: lngLat,
+                  address: poi.address,
+                }
+              })
+              .filter(Boolean) as POISearchResult[]
+            setPOISearchResults(list)
+            setIsSearching(false)
+          })
+        } else {
+          const google = await preloadGoogleMap(GOOGLE_MAP_API_KEY)
+          if (!google?.maps?.importLibrary) {
+            setPOISearchResults([])
+            setIsSearching(false)
+            return
+          }
+          const { PlacesService, PlacesServiceStatus } =
+            (await google.maps.importLibrary('places')) as { PlacesService: any; PlacesServiceStatus: any }
+          const placesService = new PlacesService(document.createElement('div'))
+          const request = { query: keyword }
+          placesService.textSearch(request, (results: any, status: string) => {
+            if (status !== PlacesServiceStatus.OK || !results) {
+              setPOISearchResults([])
+              setIsSearching(false)
+              return
+            }
+            const list: POISearchResult[] = results
+              .filter((place: any) => place.geometry?.location)
+              .slice(0, 5)
+              .map((place: any) => {
+                const location = place.geometry!.location
+                return {
+                  name: place.name ?? '未知地点',
+                  location: [location.lng(), location.lat()],
+                  address: place.formatted_address ?? place.vicinity ?? '',
+                }
+              })
+            setPOISearchResults(list)
+            setIsSearching(false)
+          })
+        }
+      } catch (error) {
+        console.error('POI搜索失败：', error)
+        setIsSearching(false)
+        setHasSearched(false)
+      }
+      return
+    }
+
+    // Toy Search (default)
     try {
       const uidParam = storedUserId ? `&uid=${encodeURIComponent(storedUserId)}` : ''
       const response = await fetch(
@@ -143,17 +233,28 @@ const SearchPage = () => {
       }
       const payload = await response.json()
       const normalized = normalizeResults(payload)
-      setSearchResults(normalized)
+      setToySearchResults(normalized)
     } catch (error) {
       console.error('搜索失败：', error)
-      setSearchResults([])
+      setToySearchResults([])
     } finally {
       setIsSearching(false)
     }
-  }, [searchValue, storedUserId])
+  }, [searchValue, storedUserId, isPOISearch, mapProvider])
 
-  const handleResultSelect = useCallback(
-    (result: SearchResult) => {
+  const handlePOIResultSelect = useCallback(
+    (result: POISearchResult) => {
+      // Dispatch custom event to notify EditTrips page
+      const event = new CustomEvent('trip-search-select', { detail: result })
+      window.dispatchEvent(event)
+      // Navigate back
+      exitSearch()
+    },
+    [exitSearch],
+  )
+
+  const handleToyResultSelect = useCallback(
+    (result: ToySearchResult) => {
       const title = result.toyName || '玩具'
       navigate('/toy', {
         state: {
@@ -257,12 +358,35 @@ const SearchPage = () => {
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
               <CircularProgress size={24} />
             </Box>
-          ) : searchResults.length > 0 ? (
+          ) : isPOISearch ? (
+            poiSearchResults.length > 0 ? (
+              <List>
+                {poiSearchResults.map((result, index) => (
+                  <ListItemButton
+                    key={`${result.name}-${index}`}
+                    onClick={() => handlePOIResultSelect(result)}
+                    sx={{ gap: 1.5, flexDirection: 'column', alignItems: 'flex-start' }}
+                  >
+                    <ListItemText
+                      primary={result.name}
+                      primaryTypographyProps={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}
+                      secondary={result.address}
+                      secondaryTypographyProps={{ fontSize: 13, color: '#64748b' }}
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            ) : hasSearched ? (
+              <Box sx={{ py: 4, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+                暂无搜索结果
+              </Box>
+            ) : null
+          ) : toySearchResults.length > 0 ? (
             <List>
-              {searchResults.map((result, index) => (
+              {toySearchResults.map((result, index) => (
                 <ListItemButton
                   key={`${result.id || result.toyName || 'item'}-${index}`}
-                  onClick={() => handleResultSelect(result)}
+                  onClick={() => handleToyResultSelect(result)}
                   sx={{ gap: 1.5 }}
                 >
                   <Box
